@@ -3,12 +3,17 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 mod audio;
 mod websocket;
 mod game;
+mod input;
 
 slint::include_modules!();
+
+use game::{GameState, ChartNote};
+use input::{InputHandler, KeyBindings};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ServerSong {
@@ -121,7 +126,12 @@ fn main() -> Result<()> {
     
     // Shared state
     let audio_context = Arc::new(Mutex::new(None));
-    let chart_data = Arc::new(Mutex::new(None));
+    let chart_data: Arc<Mutex<Option<game::Chart>>> = Arc::new(Mutex::new(None));
+    let game_state = Arc::new(Mutex::new(GameState::new()));
+    let input_handler = Arc::new(Mutex::new(InputHandler::with_default_bindings()));
+    let game_running = Arc::new(Mutex::new(false));
+    let game_start_time = Arc::new(Mutex::new(None::<Instant>));
+    let game_timer = Arc::new(Mutex::new(None::<slint::Timer>));
     
     // Load songs callback
     ui.on_load_songs({
@@ -150,9 +160,80 @@ fn main() -> Result<()> {
         let ws_url = ws_url.clone();
         let audio_context = audio_context.clone();
         let chart_data = chart_data.clone();
+        let game_state = game_state.clone();
+        let input_handler = input_handler.clone();
+        let game_running = game_running.clone();
+        let game_start_time = game_start_time.clone();
+        let game_timer = game_timer.clone();
         
         move |song_id, difficulty, instrument| {
             info!("Playing song: {} ({} - {})", song_id, difficulty, instrument);
+            
+            // Reset game state
+            *game_state.lock().unwrap() = GameState::new();
+            *game_running.lock().unwrap() = true;
+            *game_start_time.lock().unwrap() = Some(Instant::now());
+            info!("Game started, timer running");
+            
+            // Create a Slint Timer for the game loop (runs on UI thread)
+            let ui_clone = ui_weak.clone();
+            let game_state_timer = game_state.clone();
+            let game_running_timer = game_running.clone();
+            let game_start_time_timer = game_start_time.clone();
+            let chart_data_timer = chart_data.clone();
+            
+            let timer = slint::Timer::default();
+            timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+                let is_running = *game_running_timer.lock().unwrap();
+                if !is_running {
+                    return;
+                }
+                
+                // Calculate current time from audio start
+                let mut game = game_state_timer.lock().unwrap();
+                
+                if !game.is_paused {
+                    if let Some(start_time) = *game_start_time_timer.lock().unwrap() {
+                        let elapsed = start_time.elapsed().as_secs_f32();
+                        game.current_time = elapsed;
+                    }
+                }
+                
+                // Capture values before releasing lock
+                let current_time = game.current_time;
+                let score_data = ScoreData {
+                    score: game.score as i32,
+                    combo: game.combo as i32,
+                    max_combo: game.max_combo as i32,
+                    health: game.health,
+                    accuracy_perfect: game.accuracy_count.perfect as i32,
+                    accuracy_great: game.accuracy_count.great as i32,
+                    accuracy_good: game.accuracy_count.good as i32,
+                    accuracy_ok: game.accuracy_count.ok as i32,
+                    accuracy_miss: game.accuracy_count.miss as i32,
+                };
+                drop(game);
+                
+                // Update UI (safe because timer runs on UI thread)
+                if let Some(ui) = ui_clone.upgrade() {
+                    ui.set_current_playback_time(current_time);
+                    ui.set_current_score(score_data);
+                }
+                
+                // Check for missed notes
+                if let Some(chart) = chart_data_timer.lock().unwrap().as_ref() {
+                    let mut game = game_state_timer.lock().unwrap();
+                    for note in &chart.notes {
+                        let time_passed = current_time - note.time;
+                        if time_passed > 0.2 && !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == note.col) {
+                            game.record_hit(note, current_time);
+                        }
+                    }
+                }
+            });
+            
+            // Store timer to keep it alive
+            *game_timer.lock().unwrap() = Some(timer);
             
             // Initialize audio context
             match audio::AudioContext::new() {
@@ -169,6 +250,9 @@ fn main() -> Result<()> {
             match fetch_chart_from_server(&server_url, &song_id, &instrument, &difficulty) {
                 Ok(chart) => {
                     info!("Loaded chart with {} notes", chart.notes.len());
+                    if chart.notes.len() > 0 {
+                        info!("  First note: time={:.2}s, lane={}", chart.notes[0].time, chart.notes[0].col);
+                    }
                     *chart_data.lock().unwrap() = Some(chart.clone());
                     
                     // Update UI with chart notes
@@ -178,6 +262,7 @@ fn main() -> Result<()> {
                             fret: n.col as i32,
                             duration: n.duration,
                         }).collect();
+                        info!("Setting {} notes on UI", notes.len());
                         let model = std::rc::Rc::new(slint::VecModel::from(notes));
                         ui.set_chart_notes(model.into());
                     }
@@ -191,15 +276,16 @@ fn main() -> Result<()> {
             let song_id_clone = song_id.to_string();
             let ws_url_clone = ws_url.clone();
             let audio_context_clone = audio_context.clone();
+            let game_start_time_clone = game_start_time.clone();
             
             thread::spawn(move || {
-                // URL-encode the song_id to handle special characters and spaces
                 let encoded_song_id = urlencoding::encode(&song_id_clone);
                 match stream_audio_from_websocket(&ws_url_clone, &encoded_song_id) {
                     Ok(audio_data) => {
                         info!("Audio stream received: {} bytes", audio_data.len());
                         
                         if let Some(ctx) = audio_context_clone.lock().unwrap().as_ref() {
+                            *game_start_time_clone.lock().unwrap() = Some(Instant::now());
                             if let Err(e) = ctx.play_bytes(audio_data) {
                                 log::error!("Failed to play audio: {}", e);
                             } else {
@@ -212,6 +298,89 @@ fn main() -> Result<()> {
                     }
                 }
             });
+        }
+    });
+    
+    // Pause song callback
+    ui.on_pause_song({
+        let game_state = game_state.clone();
+        let audio_context = audio_context.clone();
+        let game_timer = game_timer.clone();
+        
+        move || {
+            info!("Pausing song");
+            game_state.lock().unwrap().pause();
+            if let Some(ctx) = audio_context.lock().unwrap().as_ref() {
+                ctx.pause();
+            }
+            if let Some(timer) = game_timer.lock().unwrap().as_ref() {
+                timer.stop();
+            }
+        }
+    });
+    
+    // Resume song callback
+    ui.on_resume_song({
+        let game_state = game_state.clone();
+        let audio_context = audio_context.clone();
+        let game_timer = game_timer.clone();
+        
+        move || {
+            info!("Resuming song");
+            game_state.lock().unwrap().resume();
+            if let Some(ctx) = audio_context.lock().unwrap().as_ref() {
+                ctx.resume();
+            }
+            if let Some(timer) = game_timer.lock().unwrap().as_ref() {
+                timer.restart();
+            }
+        }
+    });
+    
+    // Key press callback
+    ui.on_handle_key({
+        let input_handler = input_handler.clone();
+        let game_state = game_state.clone();
+        let chart_data = chart_data.clone();
+        let ui_weak = ui_weak.clone();
+        
+        move |key_str| {
+            if let Some(key_char) = key_str.to_uppercase().chars().next() {
+                let mut input = input_handler.lock().unwrap();
+                let mut game = game_state.lock().unwrap();
+                
+                if let Some(event) = input.handle_key_press(key_char, game.current_time) {
+                    // Check for nearby notes in the chart
+                    if let Some(chart) = chart_data.lock().unwrap().as_ref() {
+                        let hit_window = 0.2; // 200ms hit window
+                        
+                        for note in &chart.notes {
+                            if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
+                                if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == event.lane) {
+                                    let accuracy = game.record_hit(note, event.timestamp);
+                                    
+                                    info!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
+                                    
+                                    if let Some(ui) = ui_weak.upgrade() {
+                                        ui.set_current_score(ScoreData {
+                                            score: game.score as i32,
+                                            combo: game.combo as i32,
+                                            max_combo: game.max_combo as i32,
+                                            health: game.health,
+                                            accuracy_perfect: game.accuracy_count.perfect as i32,
+                                            accuracy_great: game.accuracy_count.great as i32,
+                                            accuracy_good: game.accuracy_count.good as i32,
+                                            accuracy_ok: game.accuracy_count.ok as i32,
+                                            accuracy_miss: game.accuracy_count.miss as i32,
+                                        });
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     });
     

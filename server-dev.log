@@ -1,71 +1,29 @@
 [1m[33mwarning[0m: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /home/seradedstripes/Projects/rhythm-pi/client/Cargo.toml
 workspace: /home/seradedstripes/Projects/rhythm-pi/Cargo.toml
-[1m[92m   Compiling[0m rhythm-pi-server v0.1.0 (/home/seradedstripes/Projects/rhythm-pi/server)
-[1m[33mwarning[0m[1m: unused import: `crate::hq`[0m
- [1m[94m--> [0mserver/src/handlers.rs:8:5
-  [1m[94m|[0m
-[1m[94m8[0m [1m[94m|[0m use crate::hq;
-  [1m[94m|[0m     [1m[33m^^^^^^^^^[0m
-  [1m[94m|[0m
-  [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
-[1m[33mwarning[0m[1m: unused import: `crate::hq`[0m
- [1m[94m--> [0mserver/src/song_watcher.rs:8:5
-  [1m[94m|[0m
-[1m[94m8[0m [1m[94m|[0m use crate::hq;
-  [1m[94m|[0m     [1m[33m^^^^^^^^^[0m
-
-[1m[33mwarning[0m[1m: unused variable: `meta`[0m
-  [1m[94m--> [0mserver/src/song_watcher.rs:43:13
-   [1m[94m|[0m
-[1m[94m43[0m [1m[94m|[0m         let meta = std::fs::metadata(&json_path)?;
-   [1m[94m|[0m             [1m[33m^^^^[0m [1m[33mhelp: if this is intentional, prefix it with an underscore: `_meta`[0m
-   [1m[94m|[0m
-   [1m[94m= [0m[1mnote[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-[1m[33mwarning[0m[1m: variable `total` is assigned to, but never used[0m
-   [1m[94m--> [0mserver/src/hq_rust.rs:130:13
-    [1m[94m|[0m
-[1m[94m130[0m [1m[94m|[0m         let mut total = 0.0f32;
-    [1m[94m|[0m             [1m[33m^^^^^^^^^[0m
-    [1m[94m|[0m
-    [1m[94m= [0m[1mnote[0m: consider using `_total` instead
-
-[1m[33mwarning[0m[1m: value assigned to `total` is never read[0m
-   [1m[94m--> [0mserver/src/hq_rust.rs:134:13
-    [1m[94m|[0m
-[1m[94m134[0m [1m[94m|[0m             total += mag;
-    [1m[94m|[0m             [1m[33m^^^^^^^^^^^^[0m
-    [1m[94m|[0m
-    [1m[94m= [0m[1mhelp[0m: maybe it is overwritten before being read?
-    [1m[94m= [0m[1mnote[0m: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
-
-[1m[33mwarning[0m: `rhythm-pi-server` (lib) generated 5 warnings (run `cargo fix --lib -p rhythm-pi-server` to apply 3 suggestions)
-[1m[33mwarning[0m[1m: unused imports: `auth`, `chart_gen`, and `hq`[0m
- [1m[94m--> [0mserver/src/main.rs:4:38
-  [1m[94m|[0m
-[1m[94m4[0m [1m[94m|[0m use rhythm_pi_server::{db, handlers, auth, chart_gen, song_watcher, hq, websocket};
-  [1m[94m|[0m                                      [1m[33m^^^^[0m  [1m[33m^^^^^^^^^[0m                [1m[33m^^[0m
-  [1m[94m|[0m
-  [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
-[1m[33mwarning[0m: `rhythm-pi-server` (bin "rhythm-pi-server") generated 1 warning (run `cargo fix --bin "rhythm-pi-server" -p rhythm-pi-server` to apply 1 suggestion)
-[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`dev` profile [unoptimized + debuginfo]]8;;\ target(s) in 4.86s
+[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`dev` profile [unoptimized + debuginfo]]8;;\ target(s) in 1.10s
 [1m[92m     Running[0m `target/debug/rhythm-pi-server`
-[2026-01-17T19:01:31Z INFO  rhythm_pi_server] Starting server on 0.0.0.0:8080
-[2026-01-17T19:01:31Z INFO  actix_server::builder] starting 8 workers
-[2026-01-17T19:01:31Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
-[2026-01-17T19:01:31Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:8080", workers: 8, listening on: 0.0.0.0:8080
-[2026-01-17T19:01:31Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "curl/8.17.0" 0.001093
-[2026-01-17T19:02:14Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET / HTTP/1.1" 404 0 "-" "-" 0.006927
-[2026-01-17T19:02:14Z INFO  actix_server::server] SIGTERM received; starting graceful shutdown
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::accept] accept thread stopped
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-17T19:02:14Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:50:41Z INFO  rhythm_pi_server] Starting server on 0.0.0.0:8080
+[2026-01-17T21:50:41Z INFO  actix_server::builder] starting 8 workers
+[2026-01-17T21:50:41Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
+[2026-01-17T21:50:41Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:8080", workers: 8, listening on: 0.0.0.0:8080
+[2026-01-17T21:50:41Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "curl/8.17.0" 0.001319
+[2026-01-17T21:50:52Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "ureq/2.12.1" 0.000899
+[2026-01-17T21:50:58Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs/i%20walk%20this%20earth%20all%20by%20myself/chart?instrument=lead&difficulty=Normal HTTP/1.1" 200 63409 "-" "ureq/2.12.1" 0.002833
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] WebSocket connection request for song: i walk this earth all by myself
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] WebSocket connection started for song: i walk this earth all by myself
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] Client requested audio stream start
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] Starting WebSocket audio stream for: "server/assets/songs/i walk this earth all by myself.mp3"
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] Streaming file: "server/assets/songs/i walk this earth all by myself.mp3", size: 6024277 bytes
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] File split into 736 chunks
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] Audio stream complete
+[2026-01-17T21:50:59Z INFO  rhythm_pi_server::websocket] WebSocket connection closed for song: i walk this earth all by myself
+[2026-01-17T21:50:59Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /ws/audio/i%20walk%20this%20earth%20all%20by%20myself HTTP/1.1" 101 6027268 "-" "-" 0.218235
+[2026-01-17T21:51:55Z INFO  actix_server::server] SIGTERM received; starting graceful shutdown
+[2026-01-17T21:51:55Z INFO  actix_server::accept] accept thread stopped
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-17T21:51:55Z INFO  actix_server::worker] shutting down idle worker

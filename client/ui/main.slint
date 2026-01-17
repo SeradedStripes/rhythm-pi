@@ -12,6 +12,30 @@ export struct NoteData {
     duration: float,
 }
 
+export struct ScoreData {
+    score: int,
+    combo: int,
+    max-combo: int,
+    health: float,
+    accuracy-perfect: int,
+    accuracy-great: int,
+    accuracy-good: int,
+    accuracy-ok: int,
+    accuracy-miss: int,
+}
+
+export struct KeyBinding {
+    lane: int,
+    key: string,
+}
+
+export struct GameSettings {
+    lane-1-key: string,
+    lane-2-key: string,
+    lane-3-key: string,
+    lane-4-key: string,
+}
+
 export component MainWindow inherits Window {
     preferred-width: 1280px;
     preferred-height: 720px;
@@ -22,7 +46,7 @@ export component MainWindow inherits Window {
     background: #1a1a2e;
     
     // Screens enum
-    property <int> current-screen: 0; // 0 = Main Menu, 1 = Song Select, 2 = Gameplay
+    property <int> current-screen: 0; // 0 = Main Menu, 1 = Song Select, 2 = Gameplay, 3 = Settings
     
     // Song data
     in-out property <[SongData]> songs: [];
@@ -31,10 +55,31 @@ export component MainWindow inherits Window {
     in-out property <string> selected-instrument: "lead";
     in-out property <[NoteData]> chart-notes: [];
     in-out property <float> current-playback-time: 0;
+    in-out property <ScoreData> current-score: {
+        score: 0,
+        combo: 0,
+        max-combo: 0,
+        health: 100.0,
+        accuracy-perfect: 0,
+        accuracy-great: 0,
+        accuracy-good: 0,
+        accuracy-ok: 0,
+        accuracy-miss: 0,
+    };
+    in-out property <GameSettings> key-bindings: {
+        lane-1-key: "D",
+        lane-2-key: "F",
+        lane-3-key: "J",
+        lane-4-key: "K",
+    };
     
     // Callbacks
     callback load-songs();
     callback play-song(string, string, string); // song_id, difficulty, instrument
+    callback pause-song();
+    callback resume-song();
+    callback handle-key(string);
+    callback save-settings(GameSettings);
     
     main-menu := Rectangle {
         visible: current-screen == 0;
@@ -70,6 +115,9 @@ export component MainWindow inherits Window {
                     text: "Settings";
                     width: 200px;
                     height: 50px;
+                    clicked => {
+                        current-screen = 3;
+                    }
                 }
                 
                 Button {
@@ -439,20 +487,33 @@ export component MainWindow inherits Window {
         }
     }
     
-    gameplay := Rectangle {
+    gameplay := FocusScope {
         visible: current-screen == 2;
-        background: #1a1a2e;
+        enabled: current-screen == 2;
+        
+        key-pressed(event) => {
+            if (event.text == key-bindings.lane-1-key || event.text == key-bindings.lane-2-key || 
+                event.text == key-bindings.lane-3-key || event.text == key-bindings.lane-4-key) {
+                handle-key(event.text);
+                return accept;
+            }
+            return reject;
+        }
+        
+        Rectangle {
+            background: #1a1a2e;
         
         VerticalLayout {
             padding: 20px;
             spacing: 20px;
             
-            // Header
+            // Header with score info
             HorizontalLayout {
-                height: 60px;
+                height: 80px;
+                spacing: 20px;
                 
                 VerticalLayout {
-                    spacing: 2px;
+                    spacing: 5px;
                     
                     Text {
                         text: selected-song-index >= 0 && selected-song-index < songs.length ? 
@@ -463,9 +524,342 @@ export component MainWindow inherits Window {
                     }
                     
                     Text {
-                        text: selected-instrument + " - " + selected-difficulty;
-                        font-size: 14px;
-                        color: #888888;
+                        text: selected-instrument + " - " + selected-difficulty + " | Time: " + current-playback-time + "s";
+                        font-size: 13px;
+                        color: #00ff00;
+                        font-weight: 700;
+                    }
+                }
+                
+                // Score display
+                HorizontalLayout {
+                    spacing: 30px;
+                    alignment: end;
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Score";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Text {
+                            text: current-score.score;
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                    }
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Combo";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Text {
+                            text: current-score.combo;
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: current-score.combo > 0 ? #2ecc71 : #666666;
+                        }
+                    }
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Health";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Rectangle {
+                            width: 100px;
+                            height: 20px;
+                            background: #222;
+                            border-radius: 3px;
+                            border-width: 1px;
+                            border-color: #444;
+                            
+                            Rectangle {
+                                width: 100px * (current-score.health / 100.0);
+                                height: 100%;
+                                background: current-score.health > 50 ? #2ecc71 : current-score.health > 25 ? #f39c12 : #e94560;
+                                border-radius: 3px;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Main game area with note lanes
+            Rectangle {
+                background: #0f3460;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: #16213e;
+                
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 10px;
+                    
+                    // Fret lanes with animated notes
+                    HorizontalLayout {
+                        spacing: 2px;
+                        height: 400px;
+                        
+                        // Lane 1 (Red)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #e94560;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            // Notes falling down the lane
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 0 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #e94560;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * 150px;
+                            }
+                        }
+                        
+                        // Lane 2 (Orange)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #f39c12;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 1 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #f39c12;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * 150px;
+                            }
+                        }
+                        
+                        // Lane 3 (Blue)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #3498db;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 2 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #3498db;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * 150px;
+                            }
+                        }
+                        
+                        // Lane 4 (Green)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #2ecc71;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 3 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #2ecc71;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * 150px;
+                            }
+                        }
+                    }
+                    
+                    // Strike line (hit zone) - notes should be at y=400px (bottom of lanes) when hit
+                    Rectangle {
+                        height: 6px;
+                        background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                        width: 100%;
+                        drop-shadow-blur: 10px;
+                        drop-shadow-color: #2ecc71;
+                        drop-shadow-offset-y: 0px;
+                    }
+                    
+                    // Hit zone indicator
+                    Rectangle {
+                        height: 44px;
+                        background: rgba(46, 204, 113, 0.2);
+                        border-width: 3px;
+                        border-color: #2ecc71;
+                        border-radius: 3px;
+                    }
+                    
+                    // Key hints below lanes
+                    HorizontalLayout {
+                        spacing: 2px;
+                        height: 40px;
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-1-key;
+                                color: #e94560;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-2-key;
+                                color: #f39c12;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-3-key;
+                                color: #3498db;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-4-key;
+                                color: #2ecc71;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Controls and stats
+            HorizontalLayout {
+                spacing: 20px;
+                height: 50px;
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    border-width: 1px;
+                    border-color: #444;
+                    
+                    HorizontalLayout {
+                        spacing: 20px;
+                        alignment: center;
+                        padding: 10px;
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Perfect: " + current-score.accuracy-perfect;
+                                color: #ffd700;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Great: " + current-score.accuracy-great;
+                                color: #2ecc71;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Good: " + current-score.accuracy-good;
+                                color: #3498db;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Ok: " + current-score.accuracy-ok;
+                                color: #f39c12;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Miss: " + current-score.accuracy-miss;
+                                color: #e94560;
+                                font-size: 12px;
+                            }
+                        }
                     }
                 }
                 
@@ -474,116 +868,214 @@ export component MainWindow inherits Window {
                 Button {
                     text: "Pause";
                     width: 100px;
-                }
-            }
-            
-            // Game area
-            Rectangle {
-                background: #0f3460;
-                border-radius: 10px;
-                
-                VerticalLayout {
-                    padding: 20px;
-                    spacing: 10px;
-                    
-                    // Chart title
-                    Text {
-                        text: chart-notes.length > 0 ? "Notes to Play: " + chart-notes.length : "No chart loaded";
-                        color: #00d9ff;
-                        font-size: 14px;
-                    }
-                    
-                    // Strike line
-                    Rectangle {
-                        height: 3px;
-                        background: #2ecc71;
-                    }
-                    
-                    // Fret lanes (4 lanes for 4 frets)
-                    HorizontalLayout {
-                        spacing: 1px;
-                        height: 100px;
-                        
-                        Rectangle {
-                            background: #1a2847;
-                            border-width: 1px;
-                            border-color: #e94560;
-                        }
-                        
-                        Rectangle {
-                            background: #1a2847;
-                            border-width: 1px;
-                            border-color: #f39c12;
-                        }
-                        
-                        Rectangle {
-                            background: #1a2847;
-                            border-width: 1px;
-                            border-color: #3498db;
-                        }
-                        
-                        Rectangle {
-                            background: #1a2847;
-                            border-width: 1px;
-                            border-color: #2ecc71;
-                        }
-                    }
-                    
-                    // Note list
-                    ScrollView {
-                        VerticalLayout {
-                            spacing: 2px;
-                            
-                            for note in chart-notes: Rectangle {
-                                height: 25px;
-                                background: note.fret == 0 ? #e94560 : note.fret == 1 ? #f39c12 : note.fret == 2 ? #3498db : #2ecc71;
-                                border-radius: 2px;
-                                
-                                HorizontalLayout {
-                                    padding: 5px;
-                                    Text {
-                                        text: "Fret " + note.fret + " @ " + note.time + "s";
-                                        color: #ffffff;
-                                        font-size: 12px;
-                                    }
-                                }
-                            }
-                        }
+                    clicked => {
+                        pause-song();
                     }
                 }
-            }
-            
-            // Stats and controls
-            HorizontalLayout {
-                spacing: 20px;
-                
-                Rectangle {
-                    background: #16213e;
-                    border-radius: 10px;
-                    padding: 15px;
-                    
-                    VerticalLayout {
-                        spacing: 5px;
-                        
-                        Text {
-                            text: "Score: 1250";
-                            color: #00d9ff;
-                            font-size: 16px;
-                            font-weight: 700;
-                        }
-                        
-                        Text {
-                            text: "Combo: 42";
-                            color: #ffffff;
-                            font-size: 14px;
-                        }
-                    }
-                }
-                
-                Rectangle {}
                 
                 Button {
                     text: "Back to Menu";
+                    width: 120px;
+                    clicked => {
+                        current-screen = 0;
+                    }
+                }
+            }
+        }
+        }
+    }
+    
+    settings := Rectangle {
+        visible: current-screen == 3;
+        background: #1a1a2e;
+        
+        VerticalLayout {
+            padding: 40px;
+            spacing: 30px;
+            alignment: start;
+            
+            Text {
+                text: "Settings";
+                font-size: 48px;
+                font-weight: 700;
+                color: #00d9ff;
+            }
+            
+            Rectangle {
+                background: #16213e;
+                border-radius: 10px;
+                padding: 30px;
+                
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 25px;
+                        
+                        Text {
+                            text: "Key Bindings";
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        // Lane 1 (Red)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 1 (Red):";
+                                color: #e94560;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #e94560;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-1-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 2 (Orange)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 2 (Orange):";
+                                color: #f39c12;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #f39c12;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-2-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 3 (Blue)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 3 (Blue):";
+                                color: #3498db;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #3498db;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-3-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 4 (Green)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 4 (Green):";
+                                color: #2ecc71;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #2ecc71;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-4-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: "Note: Click on any lane key to reassign (feature coming soon)";
+                            color: #888888;
+                            font-size: 12px;
+                        }
+                    }
+                }
+            }
+            
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: end;
+                
+                Button {
+                    text: "Reset to Defaults";
+                    clicked => {
+                        key-bindings = {
+                            lane-1-key: "D",
+                            lane-2-key: "F",
+                            lane-3-key: "J",
+                            lane-4-key: "K",
+                        };
+                    }
+                }
+                
+                Button {
+                    text: "Back";
                     clicked => {
                         current-screen = 0;
                     }
