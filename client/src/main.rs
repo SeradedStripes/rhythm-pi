@@ -388,10 +388,10 @@ fn main() -> Result<()> {
         let ui_weak = ui_weak.clone();
         
         move |key_str| {
-            eprintln!("=== KEY CALLBACK ===");
-            eprintln!("Received key_str: {:?}", key_str);
-            eprintln!("Length: {}", key_str.len());
-            eprintln!("Bytes: {:?}", key_str.as_bytes());
+            //eprintln!("=== KEY CALLBACK ===");
+            //eprintln!("Received key_str: {:?}", key_str);
+            //eprintln!("Length: {}", key_str.len());
+            //eprintln!("Bytes: {:?}", key_str.as_bytes());
             
             info!("Key pressed: {}", key_str);
             if let Some(key_char) = key_str.to_uppercase().chars().next() {
