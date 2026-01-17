@@ -41,4 +41,5 @@ echo "Server is up. Launching client GUI..."
 cargo run -p rhythm-pi-client --release
 
 # client exited; cleanup will run via trap
+pkill rhythm-pi || true
 exit 0

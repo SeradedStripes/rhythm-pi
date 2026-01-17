@@ -511,13 +511,13 @@ fn main() -> Result<()> {
                 if let Some(ch) = key_char {
                     // Only process if game is running
                     if *game_running_kb.lock().unwrap() {
-                        eprintln!("=== KEY PRESSED: {} ===", ch);
+                        //eprintln!("=== KEY PRESSED: {} ===", ch);
                         
                         let mut input = input_handler_kb.lock().unwrap();
                         let mut game = game_state_kb.lock().unwrap();
                         
                         if let Some(event) = input.handle_key_press(ch, game.current_time) {
-                            eprintln!("Key mapped to lane {}", event.lane);
+                            //eprintln!("Key mapped to lane {}", event.lane);
                             
                             // Highlight the key button
                             if let Some(ui) = ui_weak_kb.upgrade() {
@@ -538,7 +538,7 @@ fn main() -> Result<()> {
                                     if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
                                         if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == event.lane) {
                                             let accuracy = game.record_hit(note, event.timestamp);
-                                            eprintln!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
+                                            //eprintln!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
                                             
                                             if let Some(ui) = ui_weak_kb.upgrade() {
                                                 ui.set_current_score(ScoreData {
