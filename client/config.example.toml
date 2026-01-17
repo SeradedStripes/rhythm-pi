@@ -1,0 +1,31 @@
+#!/bin/bash
+# Configuration file for Rhythm PI Client
+
+# WebSocket server address
+SERVER_URL="ws://localhost:8080"
+
+# Audio device selection
+# Leave empty for default, or specify device index
+AUDIO_DEVICE=""
+
+# Logging level
+# Options: error, warn, info, debug, trace
+LOG_LEVEL="info"
+
+# UI theme
+# Options: dark, light
+THEME="dark"
+
+# Display settings
+WINDOW_WIDTH="1280"
+WINDOW_HEIGHT="720"
+FULLSCREEN="false"
+
+# Audio settings
+AUDIO_VOLUME="85"
+MASTER_VOLUME="100"
+
+# Game settings
+OFFSET_MS="0"
+DIFFICULTY_DEFAULT="Normal"
+ENABLE_VIBRATION="true"

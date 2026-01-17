@@ -1,0 +1,594 @@
+import { Button, StandardListView, LineEdit, ComboBox, ScrollView } from "std-widgets.slint";
+
+export struct SongData {
+    id: string,
+    title: string,
+    artists: string,
+}
+
+export struct NoteData {
+    time: float,
+    fret: int,
+    duration: float,
+}
+
+export component MainWindow inherits Window {
+    preferred-width: 1280px;
+    preferred-height: 720px;
+    min-width: 800px;
+    min-height: 600px;
+    
+    // Color scheme
+    background: #1a1a2e;
+    
+    // Screens enum
+    property <int> current-screen: 0; // 0 = Main Menu, 1 = Song Select, 2 = Gameplay
+    
+    // Song data
+    in-out property <[SongData]> songs: [];
+    in-out property <int> selected-song-index: -1;
+    in-out property <string> selected-difficulty: "Normal";
+    in-out property <string> selected-instrument: "lead";
+    in-out property <[NoteData]> chart-notes: [];
+    in-out property <float> current-playback-time: 0;
+    
+    // Callbacks
+    callback load-songs();
+    callback play-song(string, string, string); // song_id, difficulty, instrument
+    
+    main-menu := Rectangle {
+        visible: current-screen == 0;
+        background: #1a1a2e;
+        
+        VerticalLayout {
+            alignment: center;
+            padding: 20px;
+            spacing: 30px;
+            
+            Text {
+                text: "RHYTHM PI";
+                font-size: 64px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                color: #00d9ff;
+            }
+            
+            VerticalLayout {
+                alignment: center;
+                spacing: 15px;
+                
+                Button {
+                    text: "Play";
+                    width: 200px;
+                    height: 50px;
+                    clicked => {
+                        current-screen = 1;
+                    }
+                }
+                
+                Button {
+                    text: "Settings";
+                    width: 200px;
+                    height: 50px;
+                }
+                
+                Button {
+                    text: "Quit";
+                    width: 200px;
+                    height: 50px;
+                    clicked => {
+                        // Quit application
+                    }
+                }
+            }
+        }
+    }
+    
+    song-select := Rectangle {
+        visible: current-screen == 1;
+        background: #1a1a2e;
+        
+        HorizontalLayout {
+            padding: 20px;
+            spacing: 20px;
+            
+            // Song list
+            VerticalLayout {
+                width: 60%;
+                spacing: 10px;
+                
+                Text {
+                    text: "Select a Song";
+                    font-size: 32px;
+                    font-weight: 700;
+                    color: #00d9ff;
+                }
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    ScrollView {
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 5px;
+                            
+                            for song[index] in songs: Rectangle {
+                                background: selected-song-index == index ? #e94560 : #0f3460;
+                                border-radius: 5px;
+                                height: 50px;
+                                
+                                TouchArea {
+                                    clicked => {
+                                        selected-song-index = index;
+                                    }
+                                }
+                                
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    spacing: 10px;
+                                    
+                                    VerticalLayout {
+                                        alignment: start;
+                                        spacing: 2px;
+                                        
+                                        Text {
+                                            text: song.title;
+                                            color: #ffffff;
+                                            font-size: 16px;
+                                            font-weight: 600;
+                                        }
+                                        
+                                        Text {
+                                            text: song.artists;
+                                            color: #b8b8b8;
+                                            font-size: 12px;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Song details and controls
+            VerticalLayout {
+                width: 40%;
+                spacing: 20px;
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 15px;
+                        
+                        Text {
+                            text: "Song Details";
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        if selected-song-index >= 0 && selected-song-index < songs.length: VerticalLayout {
+                            spacing: 10px;
+                            
+                            Text {
+                                text: "Title: " + songs[selected-song-index].title;
+                                color: #ffffff;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                            }
+                            
+                            Text {
+                                text: "Artist: " + songs[selected-song-index].artists;
+                                color: #ffffff;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                            }
+                        }
+                        
+                        if selected-song-index < 0: Text {
+                            text: "No song selected";
+                            color: #888888;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 15px;
+                        
+                        Text {
+                            text: "Game Options";
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        // Difficulty selection
+                        VerticalLayout {
+                            spacing: 8px;
+                            
+                            Text {
+                                text: "Difficulty:";
+                                color: #00d9ff;
+                                font-size: 16px;
+                                font-weight: 600;
+                            }
+                            
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Easy" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Easy" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Easy" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Easy";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Easy";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Normal" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Normal" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Normal" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Normal";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Normal";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Hard" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Hard" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Hard" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Hard";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Hard";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Instrument selection
+                        VerticalLayout {
+                            spacing: 8px;
+                            
+                            Text {
+                                text: "Instrument:";
+                                color: #00d9ff;
+                                font-size: 16px;
+                                font-weight: 600;
+                            }
+                            
+                            GridLayout {
+                                spacing: 8px;
+                                
+                                Row {
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "lead" ? 3px : 1px;
+                                        border-color: selected-instrument == "lead" ? #2ecc71 : #555;
+                                        background: selected-instrument == "lead" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "lead";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Lead";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "bass" ? 3px : 1px;
+                                        border-color: selected-instrument == "bass" ? #2ecc71 : #555;
+                                        background: selected-instrument == "bass" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "bass";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Bass";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                
+                                Row {
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "drums" ? 3px : 1px;
+                                        border-color: selected-instrument == "drums" ? #2ecc71 : #555;
+                                        background: selected-instrument == "drums" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "drums";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Drums";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "vocals" ? 3px : 1px;
+                                        border-color: selected-instrument == "vocals" ? #2ecc71 : #555;
+                                        background: selected-instrument == "vocals" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "vocals";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Vocals";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalLayout {
+                    spacing: 10px;
+                    
+                    Button {
+                        text: "Play";
+                        enabled: selected-song-index >= 0;
+                        clicked => {
+                            if selected-song-index >= 0 && selected-song-index < songs.length {
+                                play-song(songs[selected-song-index].id, selected-difficulty, selected-instrument);
+                                current-screen = 2;
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        text: "Back";
+                        clicked => {
+                            current-screen = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    gameplay := Rectangle {
+        visible: current-screen == 2;
+        background: #1a1a2e;
+        
+        VerticalLayout {
+            padding: 20px;
+            spacing: 20px;
+            
+            // Header
+            HorizontalLayout {
+                height: 60px;
+                
+                VerticalLayout {
+                    spacing: 2px;
+                    
+                    Text {
+                        text: selected-song-index >= 0 && selected-song-index < songs.length ? 
+                              "Now Playing: " + songs[selected-song-index].title : "Now Playing";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: #00d9ff;
+                    }
+                    
+                    Text {
+                        text: selected-instrument + " - " + selected-difficulty;
+                        font-size: 14px;
+                        color: #888888;
+                    }
+                }
+                
+                Rectangle {}
+                
+                Button {
+                    text: "Pause";
+                    width: 100px;
+                }
+            }
+            
+            // Game area
+            Rectangle {
+                background: #0f3460;
+                border-radius: 10px;
+                
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 10px;
+                    
+                    // Chart title
+                    Text {
+                        text: chart-notes.length > 0 ? "Notes to Play: " + chart-notes.length : "No chart loaded";
+                        color: #00d9ff;
+                        font-size: 14px;
+                    }
+                    
+                    // Strike line
+                    Rectangle {
+                        height: 3px;
+                        background: #2ecc71;
+                    }
+                    
+                    // Fret lanes (4 lanes for 4 frets)
+                    HorizontalLayout {
+                        spacing: 1px;
+                        height: 100px;
+                        
+                        Rectangle {
+                            background: #1a2847;
+                            border-width: 1px;
+                            border-color: #e94560;
+                        }
+                        
+                        Rectangle {
+                            background: #1a2847;
+                            border-width: 1px;
+                            border-color: #f39c12;
+                        }
+                        
+                        Rectangle {
+                            background: #1a2847;
+                            border-width: 1px;
+                            border-color: #3498db;
+                        }
+                        
+                        Rectangle {
+                            background: #1a2847;
+                            border-width: 1px;
+                            border-color: #2ecc71;
+                        }
+                    }
+                    
+                    // Note list
+                    ScrollView {
+                        VerticalLayout {
+                            spacing: 2px;
+                            
+                            for note in chart-notes: Rectangle {
+                                height: 25px;
+                                background: note.fret == 0 ? #e94560 : note.fret == 1 ? #f39c12 : note.fret == 2 ? #3498db : #2ecc71;
+                                border-radius: 2px;
+                                
+                                HorizontalLayout {
+                                    padding: 5px;
+                                    Text {
+                                        text: "Fret " + note.fret + " @ " + note.time + "s";
+                                        color: #ffffff;
+                                        font-size: 12px;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Stats and controls
+            HorizontalLayout {
+                spacing: 20px;
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    padding: 15px;
+                    
+                    VerticalLayout {
+                        spacing: 5px;
+                        
+                        Text {
+                            text: "Score: 1250";
+                            color: #00d9ff;
+                            font-size: 16px;
+                            font-weight: 700;
+                        }
+                        
+                        Text {
+                            text: "Combo: 42";
+                            color: #ffffff;
+                            font-size: 14px;
+                        }
+                    }
+                }
+                
+                Rectangle {}
+                
+                Button {
+                    text: "Back to Menu";
+                    clicked => {
+                        current-screen = 0;
+                    }
+                }
+            }
+        }
+    }
+}

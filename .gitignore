@@ -1,0 +1,9 @@
+/target
+/server/target
+/client/target
+
+# Ignore Songs for copyright reasons
+/server/assets/songs/*.mp3
+/server/assets/songs/*wav
+/server/assets/songs/*.json
+/server/assets/charts/*.json

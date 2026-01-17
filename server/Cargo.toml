@@ -1,0 +1,41 @@
+[package]
+name = "rhythm-pi-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4"
+actix-files = "0.6"
+actix-web-actors = "4"
+sqlx = { version = "0.7", features = ["sqlite","runtime-tokio-native-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util"] }
+anyhow = "1.0"
+env_logger = "0.10"
+log = "0.4"
+mime_guess = "2.0"
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "8"
+argon2 = "0.4"
+rand = "0.8"
+dotenvy = "0.15"
+actix-cors = "0.6"
+actix = "0.13"
+futures = "0.3"
+bytes = "1.0"
+
+# Audio processing for Rust HQ generator
+hound = "3"
+rustfft = "6"
+ndarray = "0.16"
+num-complex = "0.4"
+num-traits = "0.2"
+
+[dev-dependencies]
+actix-rt = "2"
+tempfile = "3"
+jsonwebtoken = "8"
+argon2 = "0.4"
+rand = "0.8"
+dotenvy = "0.15"

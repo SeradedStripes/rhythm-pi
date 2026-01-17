@@ -1,0 +1,16 @@
+# Cross-compilation configuration for different targets
+
+# Linux ARM (armv7) configuration
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+ar = "arm-linux-gnueabihf-ar"
+# Optionally set rustflags for ARM builds
+# rustflags = ["-C", "link-arg=-march=armv7-a"]
+
+# Windows configuration (uses default linking)
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+
+# Default build options
+[build]
+jobs = 4  # Parallel jobs for faster builds
