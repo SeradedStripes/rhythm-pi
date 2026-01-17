@@ -10,7 +10,7 @@ LOGFILE="./server-dev.log"
 
 echo "Starting Rhythm PI server (logs -> ${LOGFILE})..."
 # run server in background and capture its PID
-cargo run -p rhythm-pi-server --bin rhythm-pi-server > "$LOGFILE" 2>&1 &
+cargo run -p rhythm-pi-server --bin rhythm-pi-server --release > "$LOGFILE" 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
@@ -38,7 +38,7 @@ done
 
 echo "Server is up. Launching client GUI..."
 # Run client in foreground so user can interact; when it exits, cleanup trap runs
-cargo run -p rhythm-pi-client
+cargo run -p rhythm-pi-client --release
 
 # client exited; cleanup will run via trap
 exit 0

@@ -67,11 +67,17 @@ export component MainWindow inherits Window {
         accuracy-miss: 0,
     };
     in-out property <GameSettings> key-bindings: {
-        lane-1-key: "D",
-        lane-2-key: "F",
+        lane-1-key: "A",
+        lane-2-key: "S",
         lane-3-key: "J",
         lane-4-key: "K",
     };
+    
+    // Lane press state for visual feedback
+    in-out property <bool> lane-1-pressed: false;
+    in-out property <bool> lane-2-pressed: false;
+    in-out property <bool> lane-3-pressed: false;
+    in-out property <bool> lane-4-pressed: false;
     
     // Callbacks
     callback load-songs();
@@ -80,6 +86,13 @@ export component MainWindow inherits Window {
     callback resume-song();
     callback handle-key(string);
     callback save-settings(GameSettings);
+    callback set-lane-pressed(int);
+    callback unset-lane-pressed(int);
+    callback focus-key-input();
+    
+    focus-key-input => {
+        key-input.focus();
+    }
     
     main-menu := Rectangle {
         visible: current-screen == 0;
@@ -491,13 +504,17 @@ export component MainWindow inherits Window {
         visible: current-screen == 2;
         enabled: current-screen == 2;
         
-        key-pressed(event) => {
-            if (event.text == key-bindings.lane-1-key || event.text == key-bindings.lane-2-key || 
-                event.text == key-bindings.lane-3-key || event.text == key-bindings.lane-4-key) {
-                handle-key(event.text);
-                return accept;
+        key-input := TextInput {
+            width: 0;
+            height: 0;
+            
+            key-pressed(event) => {
+                if (event.text != "") {
+                    handle-key(event.text);
+                    return accept;
+                }
+                return reject;
             }
-            return reject;
         }
         
         Rectangle {

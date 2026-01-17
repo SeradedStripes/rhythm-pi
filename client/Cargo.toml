@@ -19,6 +19,7 @@ log = "0.4"
 env_logger = "0.10"
 ureq = { version = "2.9", features = ["json"] }
 urlencoding = "2.1"
+rdev = "0.5"
 
 [build-dependencies]
 slint-build = "1.6"

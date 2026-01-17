@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use rdev::{listen, Event, EventType, Key};
 
 mod audio;
 mod websocket;
@@ -12,8 +13,8 @@ mod input;
 
 slint::include_modules!();
 
-use game::{GameState, ChartNote};
-use input::{InputHandler, KeyBindings};
+use game::GameState;
+use input::InputHandler;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ServerSong {
@@ -161,13 +162,17 @@ fn main() -> Result<()> {
         let audio_context = audio_context.clone();
         let chart_data = chart_data.clone();
         let game_state = game_state.clone();
-        let input_handler = input_handler.clone();
         let game_running = game_running.clone();
         let game_start_time = game_start_time.clone();
         let game_timer = game_timer.clone();
         
         move |song_id, difficulty, instrument| {
             info!("Playing song: {} ({} - {})", song_id, difficulty, instrument);
+            
+            // Request focus on the key input
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.invoke_focus_key_input();
+            }
             
             // Reset game state
             *game_state.lock().unwrap() = GameState::new();
@@ -183,50 +188,88 @@ fn main() -> Result<()> {
             let chart_data_timer = chart_data.clone();
             
             let timer = slint::Timer::default();
+            let frame_count = Arc::new(Mutex::new(0));
+            let last_log = Arc::new(Mutex::new(Instant::now()));
+            let frame_count_timer = frame_count.clone();
+            let last_log_timer = last_log.clone();
+            
             timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
                 let is_running = *game_running_timer.lock().unwrap();
                 if !is_running {
                     return;
                 }
                 
-                // Calculate current time from audio start
-                let mut game = game_state_timer.lock().unwrap();
+                let mut fc = frame_count_timer.lock().unwrap();
+                *fc += 1;
+                let frame = *fc;
+                drop(fc);
                 
-                if !game.is_paused {
-                    if let Some(start_time) = *game_start_time_timer.lock().unwrap() {
-                        let elapsed = start_time.elapsed().as_secs_f32();
-                        game.current_time = elapsed;
+                let should_log = frame % 60 == 0;
+                let should_update_ui = frame % 3 == 0; // Update UI ~20 times/sec instead of 60
+                let should_check_misses = frame % 15 == 0; // Check misses ~4 times/sec
+                
+                if should_log {
+                    let mut ll = last_log_timer.lock().unwrap();
+                    let elapsed = ll.elapsed().as_secs_f32();
+                    let fps = 60.0 / elapsed;
+                    eprintln!("Timer FPS: {:.1}", fps);
+                    *ll = Instant::now();
+                }
+                
+                // Calculate current time from audio start
+                let current_time = if let Some(start_time) = *game_start_time_timer.lock().unwrap() {
+                    start_time.elapsed().as_secs_f32()
+                } else {
+                    0.0
+                };
+                
+                // Update game state time (fast operation)
+                {
+                    let mut game = game_state_timer.lock().unwrap();
+                    if !game.is_paused {
+                        game.current_time = current_time;
                     }
                 }
                 
-                // Capture values before releasing lock
-                let current_time = game.current_time;
-                let score_data = ScoreData {
-                    score: game.score as i32,
-                    combo: game.combo as i32,
-                    max_combo: game.max_combo as i32,
-                    health: game.health,
-                    accuracy_perfect: game.accuracy_count.perfect as i32,
-                    accuracy_great: game.accuracy_count.great as i32,
-                    accuracy_good: game.accuracy_count.good as i32,
-                    accuracy_ok: game.accuracy_count.ok as i32,
-                    accuracy_miss: game.accuracy_count.miss as i32,
-                };
-                drop(game);
-                
-                // Update UI (safe because timer runs on UI thread)
-                if let Some(ui) = ui_clone.upgrade() {
-                    ui.set_current_playback_time(current_time);
-                    ui.set_current_score(score_data);
+                // Update UI less frequently (this is expensive)
+                if should_update_ui {
+                    if let Some(ui) = ui_clone.upgrade() {
+                        ui.set_current_playback_time(current_time);
+                    }
                 }
                 
-                // Check for missed notes
-                if let Some(chart) = chart_data_timer.lock().unwrap().as_ref() {
-                    let mut game = game_state_timer.lock().unwrap();
-                    for note in &chart.notes {
-                        let time_passed = current_time - note.time;
-                        if time_passed > 0.2 && !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == note.col) {
-                            game.record_hit(note, current_time);
+                // Check for missed notes (least frequently)
+                if should_check_misses {
+                    if let Some(chart) = chart_data_timer.lock().unwrap().as_ref() {
+                        let mut game = game_state_timer.lock().unwrap();
+                        
+                        // Only check notes within a reasonable time window
+                        for note in &chart.notes {
+                            let time_diff = current_time - note.time;
+                            
+                            // Only check notes that are slightly past their hit time
+                            if time_diff > 0.2 && time_diff < 0.5 {
+                                if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == note.col) {
+                                    game.record_hit(note, current_time);
+                                }
+                            }
+                        }
+                        
+                        // Update score UI
+                        let score_data = ScoreData {
+                            score: game.score as i32,
+                            combo: game.combo as i32,
+                            max_combo: game.max_combo as i32,
+                            health: game.health,
+                            accuracy_perfect: game.accuracy_count.perfect as i32,
+                            accuracy_great: game.accuracy_count.great as i32,
+                            accuracy_good: game.accuracy_count.good as i32,
+                            accuracy_ok: game.accuracy_count.ok as i32,
+                            accuracy_miss: game.accuracy_count.miss as i32,
+                        };
+                        
+                        if let Some(ui) = ui_clone.upgrade() {
+                            ui.set_current_score(score_data);
                         }
                     }
                 }
@@ -345,11 +388,31 @@ fn main() -> Result<()> {
         let ui_weak = ui_weak.clone();
         
         move |key_str| {
+            eprintln!("=== KEY CALLBACK ===");
+            eprintln!("Received key_str: {:?}", key_str);
+            eprintln!("Length: {}", key_str.len());
+            eprintln!("Bytes: {:?}", key_str.as_bytes());
+            
+            info!("Key pressed: {}", key_str);
             if let Some(key_char) = key_str.to_uppercase().chars().next() {
+                eprintln!("Extracted char: {:?}", key_char);
                 let mut input = input_handler.lock().unwrap();
                 let mut game = game_state.lock().unwrap();
                 
+                info!("Handling key '{}' at game time {:.3}s", key_char, game.current_time);
+                
                 if let Some(event) = input.handle_key_press(key_char, game.current_time) {
+                    // Highlight the key button
+                    if let Some(ui) = ui_weak.upgrade() {
+                        match event.lane {
+                            0 => ui.invoke_set_lane_pressed(0),
+                            1 => ui.invoke_set_lane_pressed(1),
+                            2 => ui.invoke_set_lane_pressed(2),
+                            3 => ui.invoke_set_lane_pressed(3),
+                            _ => {}
+                        }
+                    }
+                    
                     // Check for nearby notes in the chart
                     if let Some(chart) = chart_data.lock().unwrap().as_ref() {
                         let hit_window = 0.2; // 200ms hit window
@@ -384,10 +447,125 @@ fn main() -> Result<()> {
         }
     });
     
+    // Set lane pressed callback
+    ui.on_set_lane_pressed({
+        let ui_weak = ui_weak.clone();
+        move |lane| {
+            if let Some(ui) = ui_weak.upgrade() {
+                match lane {
+                    0 => ui.set_lane_1_pressed(true),
+                    1 => ui.set_lane_2_pressed(true),
+                    2 => ui.set_lane_3_pressed(true),
+                    3 => ui.set_lane_4_pressed(true),
+                    _ => {}
+                }
+                
+                // Schedule a timer to unpress after 100ms
+                let ui_clone = ui_weak.clone();
+                let timer = slint::Timer::default();
+                timer.start(slint::TimerMode::SingleShot, Duration::from_millis(100), move || {
+                    if let Some(ui) = ui_clone.upgrade() {
+                        match lane {
+                            0 => ui.set_lane_1_pressed(false),
+                            1 => ui.set_lane_2_pressed(false),
+                            2 => ui.set_lane_3_pressed(false),
+                            3 => ui.set_lane_4_pressed(false),
+                            _ => {}
+                        }
+                    }
+                });
+            }
+        }
+    });
+    
+    // Focus key input callback
+    ui.on_focus_key_input({
+        move || {
+            eprintln!("Attempting to focus key input");
+        }
+    });
+    
     // Load songs on startup
     ui.invoke_load_songs();
     
     info!("UI initialized successfully");
+    
+    // Start keyboard listener in a separate thread
+    let ui_weak_kb = ui_weak.clone();
+    let input_handler_kb = input_handler.clone();
+    let game_state_kb = game_state.clone();
+    let chart_data_kb = chart_data.clone();
+    let game_running_kb = game_running.clone();
+    
+    thread::spawn(move || {
+        if let Err(e) = listen(move |event: Event| {
+            if let EventType::KeyPress(key) = event.event_type {
+                let key_char = match key {
+                    Key::KeyA => Some('A'),
+                    Key::KeyS => Some('S'),
+                    Key::KeyJ => Some('J'),
+                    Key::KeyK => Some('K'),
+                    _ => None,
+                };
+                
+                if let Some(ch) = key_char {
+                    // Only process if game is running
+                    if *game_running_kb.lock().unwrap() {
+                        eprintln!("=== KEY PRESSED: {} ===", ch);
+                        
+                        let mut input = input_handler_kb.lock().unwrap();
+                        let mut game = game_state_kb.lock().unwrap();
+                        
+                        if let Some(event) = input.handle_key_press(ch, game.current_time) {
+                            eprintln!("Key mapped to lane {}", event.lane);
+                            
+                            // Highlight the key button
+                            if let Some(ui) = ui_weak_kb.upgrade() {
+                                match event.lane {
+                                    0 => ui.invoke_set_lane_pressed(0),
+                                    1 => ui.invoke_set_lane_pressed(1),
+                                    2 => ui.invoke_set_lane_pressed(2),
+                                    3 => ui.invoke_set_lane_pressed(3),
+                                    _ => {}
+                                }
+                            }
+                            
+                            // Check for nearby notes in the chart
+                            if let Some(chart) = chart_data_kb.lock().unwrap().as_ref() {
+                                let hit_window = 0.2;
+                                
+                                for note in &chart.notes {
+                                    if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
+                                        if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == event.lane) {
+                                            let accuracy = game.record_hit(note, event.timestamp);
+                                            eprintln!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
+                                            
+                                            if let Some(ui) = ui_weak_kb.upgrade() {
+                                                ui.set_current_score(ScoreData {
+                                                    score: game.score as i32,
+                                                    combo: game.combo as i32,
+                                                    max_combo: game.max_combo as i32,
+                                                    health: game.health,
+                                                    accuracy_perfect: game.accuracy_count.perfect as i32,
+                                                    accuracy_great: game.accuracy_count.great as i32,
+                                                    accuracy_good: game.accuracy_count.good as i32,
+                                                    accuracy_ok: game.accuracy_count.ok as i32,
+                                                    accuracy_miss: game.accuracy_count.miss as i32,
+                                                });
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }) {
+            eprintln!("Error listening to keyboard: {:?}", e);
+        }
+    });
     
     // Run the UI (this blocks until the window is closed)
     ui.run()?;

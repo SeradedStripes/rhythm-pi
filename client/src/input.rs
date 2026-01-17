@@ -12,8 +12,8 @@ pub struct KeyBindings {
 impl Default for KeyBindings {
     fn default() -> Self {
         Self {
-            lane_1: 'D',
-            lane_2: 'F',
+            lane_1: 'A',
+            lane_2: 'S',
             lane_3: 'J',
             lane_4: 'K',
         }
@@ -106,8 +106,8 @@ mod tests {
     #[test]
     fn test_key_to_lane() {
         let bindings = KeyBindings::default();
-        assert_eq!(bindings.key_to_lane('d'), Some(0));
-        assert_eq!(bindings.key_to_lane('f'), Some(1));
+        assert_eq!(bindings.key_to_lane('a'), Some(0));
+        assert_eq!(bindings.key_to_lane('s'), Some(1));
         assert_eq!(bindings.key_to_lane('j'), Some(2));
         assert_eq!(bindings.key_to_lane('k'), Some(3));
         assert_eq!(bindings.key_to_lane('x'), None);
@@ -117,17 +117,17 @@ mod tests {
     fn test_input_handler() {
         let mut handler = InputHandler::with_default_bindings();
         
-        let event = handler.handle_key_press('d', 1.5);
+        let event = handler.handle_key_press('a', 1.5);
         assert!(event.is_some());
         
         let event = event.unwrap();
         assert_eq!(event.lane, 0);
         assert_eq!(event.timestamp, 1.5);
         
-        assert!(handler.is_key_pressed('d'));
+        assert!(handler.is_key_pressed('a'));
         assert!(handler.is_lane_pressed(0));
         
-        handler.handle_key_release('d');
-        assert!(!handler.is_key_pressed('d'));
+        handler.handle_key_release('a');
+        assert!(!handler.is_key_pressed('a'));
     }
 }
