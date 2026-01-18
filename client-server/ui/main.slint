@@ -1,0 +1,1195 @@
+import { Button, StandardListView, LineEdit, ComboBox, ScrollView, Slider } from "std-widgets.slint";
+
+export struct SongData {
+    id: string,
+    title: string,
+    artists: string,
+}
+
+export struct NoteData {
+    time: float,
+    fret: int,
+    duration: float,
+}
+
+export struct ScoreData {
+    score: int,
+    combo: int,
+    max-combo: int,
+    health: float,
+    accuracy-perfect: int,
+    accuracy-great: int,
+    accuracy-good: int,
+    accuracy-ok: int,
+    accuracy-miss: int,
+}
+
+export struct KeyBinding {
+    lane: int,
+    key: string,
+}
+
+export struct GameSettings {
+    lane-1-key: string,
+    lane-2-key: string,
+    lane-3-key: string,
+    lane-4-key: string,
+}
+
+export component MainWindow inherits Window {
+    preferred-width: 1280px;
+    preferred-height: 720px;
+    min-width: 800px;
+    min-height: 600px;
+    
+    // Color scheme
+    background: #1a1a2e;
+    
+    // Screens enum
+    property <int> current-screen: 0; // 0 = Main Menu, 1 = Song Select, 2 = Gameplay, 3 = Settings
+    
+    // Song data
+    in-out property <[SongData]> songs: [];
+    in-out property <int> selected-song-index: -1;
+    in-out property <string> selected-difficulty: "Normal";
+    in-out property <string> selected-instrument: "lead";
+    in-out property <[NoteData]> chart-notes: [];
+    in-out property <float> current-playback-time: 0;
+    // Note scroll speed multiplier (1.0x - 5.0x, step 0.25)
+    in-out property <float> note-speed: 1.0;
+    in-out property <ScoreData> current-score: {
+        score: 0,
+        combo: 0,
+        max-combo: 0,
+        health: 100.0,
+        accuracy-perfect: 0,
+        accuracy-great: 0,
+        accuracy-good: 0,
+        accuracy-ok: 0,
+        accuracy-miss: 0,
+    };
+    in-out property <GameSettings> key-bindings: {
+        lane-1-key: "A",
+        lane-2-key: "S",
+        lane-3-key: "J",
+        lane-4-key: "K",
+    };
+    
+    // Lane press state for visual feedback
+    in-out property <bool> lane-1-pressed: false;
+    in-out property <bool> lane-2-pressed: false;
+    in-out property <bool> lane-3-pressed: false;
+    in-out property <bool> lane-4-pressed: false;
+    
+    // Callbacks
+    callback load-songs();
+    callback play-song(string, string, string); // song_id, difficulty, instrument
+    callback pause-song();
+    callback resume-song();
+    callback handle-key(string);
+    callback save-settings(GameSettings);
+    callback set-lane-pressed(int);
+    callback unset-lane-pressed(int);
+    callback focus-key-input();
+    
+    focus-key-input => {
+        key-input.focus();
+    }
+    
+    main-menu := Rectangle {
+        visible: current-screen == 0;
+        background: #1a1a2e;
+        
+        VerticalLayout {
+            alignment: center;
+            padding: 20px;
+            spacing: 30px;
+            
+            Text {
+                text: "RHYTHM PI";
+                font-size: 64px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                color: #00d9ff;
+            }
+            
+            VerticalLayout {
+                alignment: center;
+                spacing: 15px;
+                
+                Button {
+                    text: "Play";
+                    width: 200px;
+                    height: 50px;
+                    clicked => {
+                        current-screen = 1;
+                    }
+                }
+                
+                Button {
+                    text: "Settings";
+                    width: 200px;
+                    height: 50px;
+                    clicked => {
+                        current-screen = 3;
+                    }
+                }
+                
+                Button {
+                    text: "Quit";
+                    width: 200px;
+                    height: 50px;
+                    clicked => {
+                        // Quit application
+                    }
+                }
+            }
+        }
+    }
+    
+    song-select := Rectangle {
+        visible: current-screen == 1;
+        background: #1a1a2e;
+        
+        HorizontalLayout {
+            padding: 20px;
+            spacing: 20px;
+            
+            // Song list
+            VerticalLayout {
+                width: 60%;
+                spacing: 10px;
+                
+                Text {
+                    text: "Select a Song";
+                    font-size: 32px;
+                    font-weight: 700;
+                    color: #00d9ff;
+                }
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    ScrollView {
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 5px;
+                            
+                            for song[index] in songs: Rectangle {
+                                background: selected-song-index == index ? #e94560 : #0f3460;
+                                border-radius: 5px;
+                                height: 50px;
+                                
+                                TouchArea {
+                                    clicked => {
+                                        selected-song-index = index;
+                                    }
+                                }
+                                
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    spacing: 10px;
+                                    
+                                    VerticalLayout {
+                                        alignment: start;
+                                        spacing: 2px;
+                                        
+                                        Text {
+                                            text: song.title;
+                                            color: #ffffff;
+                                            font-size: 16px;
+                                            font-weight: 600;
+                                        }
+                                        
+                                        Text {
+                                            text: song.artists;
+                                            color: #b8b8b8;
+                                            font-size: 12px;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Song details and controls
+            VerticalLayout {
+                width: 40%;
+                spacing: 20px;
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 15px;
+                        
+                        Text {
+                            text: "Song Details";
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        if selected-song-index >= 0 && selected-song-index < songs.length: VerticalLayout {
+                            spacing: 10px;
+                            
+                            Text {
+                                text: "Title: " + songs[selected-song-index].title;
+                                color: #ffffff;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                            }
+                            
+                            Text {
+                                text: "Artist: " + songs[selected-song-index].artists;
+                                color: #ffffff;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                            }
+                        }
+                        
+                        if selected-song-index < 0: Text {
+                            text: "No song selected";
+                            color: #888888;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 15px;
+                        
+                        Text {
+                            text: "Game Options";
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        // Difficulty selection
+                        VerticalLayout {
+                            spacing: 8px;
+                            
+                            Text {
+                                text: "Difficulty:";
+                                color: #00d9ff;
+                                font-size: 16px;
+                                font-weight: 600;
+                            }
+                            
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Easy" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Easy" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Easy" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Easy";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Easy";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Normal" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Normal" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Normal" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Normal";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Normal";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                
+                                Rectangle {
+                                    width: 80px;
+                                    height: 40px;
+                                    border-radius: 5px;
+                                    border-width: selected-difficulty == "Hard" ? 3px : 1px;
+                                    border-color: selected-difficulty == "Hard" ? #2ecc71 : #555;
+                                    background: selected-difficulty == "Hard" ? #0f3460 : #16213e;
+                                    
+                                    TouchArea {
+                                        clicked => {
+                                            selected-difficulty = "Hard";
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        text: "Hard";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Instrument selection
+                        VerticalLayout {
+                            spacing: 8px;
+                            
+                            Text {
+                                text: "Instrument:";
+                                color: #00d9ff;
+                                font-size: 16px;
+                                font-weight: 600;
+                            }
+                            
+                            GridLayout {
+                                spacing: 8px;
+                                
+                                Row {
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "lead" ? 3px : 1px;
+                                        border-color: selected-instrument == "lead" ? #2ecc71 : #555;
+                                        background: selected-instrument == "lead" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "lead";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Lead";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "bass" ? 3px : 1px;
+                                        border-color: selected-instrument == "bass" ? #2ecc71 : #555;
+                                        background: selected-instrument == "bass" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "bass";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Bass";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                
+                                Row {
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "drums" ? 3px : 1px;
+                                        border-color: selected-instrument == "drums" ? #2ecc71 : #555;
+                                        background: selected-instrument == "drums" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "drums";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Drums";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    
+                                    Rectangle {
+                                        width: 80px;
+                                        height: 40px;
+                                        border-radius: 5px;
+                                        border-width: selected-instrument == "vocals" ? 3px : 1px;
+                                        border-color: selected-instrument == "vocals" ? #2ecc71 : #555;
+                                        background: selected-instrument == "vocals" ? #0f3460 : #16213e;
+                                        
+                                        TouchArea {
+                                            clicked => {
+                                                selected-instrument = "vocals";
+                                            }
+                                        }
+                                        
+                                        Text {
+                                            text: "Vocals";
+                                            color: #ffffff;
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalLayout {
+                    spacing: 10px;
+                    
+                    Button {
+                        text: "Play";
+                        enabled: selected-song-index >= 0;
+                        clicked => {
+                            if selected-song-index >= 0 && selected-song-index < songs.length {
+                                play-song(songs[selected-song-index].id, selected-difficulty, selected-instrument);
+                                current-screen = 2;
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        text: "Back";
+                        clicked => {
+                            current-screen = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    gameplay := FocusScope {
+        visible: current-screen == 2;
+        enabled: current-screen == 2;
+        
+        key-input := TextInput {
+            width: 0;
+            height: 0;
+            
+            key-pressed(event) => {
+                if (event.text != "") {
+                    handle-key(event.text);
+                    return accept;
+                }
+                return reject;
+            }
+        }
+        
+        Rectangle {
+            background: #1a1a2e;
+        
+        VerticalLayout {
+            padding: 20px;
+            spacing: 20px;
+            
+            // Header with score info
+            HorizontalLayout {
+                height: 80px;
+                spacing: 20px;
+                
+                VerticalLayout {
+                    spacing: 5px;
+                    
+                    Text {
+                        text: selected-song-index >= 0 && selected-song-index < songs.length ? 
+                              "Now Playing: " + songs[selected-song-index].title : "Now Playing";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: #00d9ff;
+                    }
+                    
+                    Text {
+                        text: selected-instrument + " - " + selected-difficulty + " | Time: " + current-playback-time + "s";
+                        font-size: 13px;
+                        color: #00ff00;
+                        font-weight: 700;
+                    }
+                }
+                
+                // Score display
+                HorizontalLayout {
+                    spacing: 30px;
+                    alignment: end;
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Score";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Text {
+                            text: current-score.score;
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                    }
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Combo";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Text {
+                            text: current-score.combo;
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: current-score.combo > 0 ? #2ecc71 : #666666;
+                        }
+                    }
+                    
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        
+                        Text {
+                            text: "Health";
+                            font-size: 12px;
+                            color: #888888;
+                        }
+                        
+                        Rectangle {
+                            width: 100px;
+                            height: 20px;
+                            background: #222;
+                            border-radius: 3px;
+                            border-width: 1px;
+                            border-color: #444;
+                            
+                            Rectangle {
+                                width: 100px * (current-score.health / 100.0);
+                                height: 100%;
+                                background: current-score.health > 50 ? #2ecc71 : current-score.health > 25 ? #f39c12 : #e94560;
+                                border-radius: 3px;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Main game area with note lanes
+            Rectangle {
+                background: #0f3460;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: #16213e;
+                
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 10px;
+                    width: 60%;
+                    
+                    // Fret lanes with animated notes
+                    HorizontalLayout {
+                        spacing: 2px;
+                        height: 500px;
+                        
+                        // Lane 1 (Red)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #e94560;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(233, 69, 96, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(233, 69, 96, 0.7);
+                                border-radius: 3px;
+                            }
+                            
+                            // Notes falling down the lane
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 0 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #e94560;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
+                            }
+                        }
+                        
+                        // Lane 2 (Orange)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #f39c12;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(243, 156, 18, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(243, 156, 18, 0.7);
+                                border-radius: 3px;
+                            }
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 1 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #f39c12;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
+                            }
+                        }
+                        
+                        // Lane 3 (Blue)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #3498db;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(52, 152, 219, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(52, 152, 219, 0.7);
+                                border-radius: 3px;
+                            }
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 2 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #3498db;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
+                            }
+                        }
+                        
+                        // Lane 4 (Green)
+                        Rectangle {
+                            width: 25%;
+                            background: #1a2847;
+                            border-width: 2px;
+                            border-color: #2ecc71;
+                            border-radius: 5px;
+                            clip: true;
+                            
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(46, 204, 113, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(46, 204, 113, 0.7);
+                                border-radius: 3px;
+                            }
+                            
+                            for note in chart-notes: Rectangle {
+                                visible: note.fret == 3 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
+                                width: parent.width;
+                                height: 30px;
+                                background: #2ecc71;
+                                border-radius: 2px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
+                            }
+                        }
+                    }
+                    
+                    // Key hints below lanes
+                    HorizontalLayout {
+                        spacing: 2px;
+                        height: 40px;
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-1-key;
+                                color: #e94560;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-2-key;
+                                color: #f39c12;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-3-key;
+                                color: #3498db;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 25%;
+                            background: #16213e;
+                            border-width: 1px;
+                            border-color: #666;
+                            border-radius: 3px;
+                            
+                            Text {
+                                text: key-bindings.lane-4-key;
+                                color: #2ecc71;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Controls and stats
+            HorizontalLayout {
+                spacing: 20px;
+                height: 50px;
+                
+                Rectangle {
+                    background: #16213e;
+                    border-radius: 10px;
+                    border-width: 1px;
+                    border-color: #444;
+                    
+                    HorizontalLayout {
+                        spacing: 20px;
+                        alignment: center;
+                        padding: 10px;
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Perfect: " + current-score.accuracy-perfect;
+                                color: #ffd700;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Great: " + current-score.accuracy-great;
+                                color: #2ecc71;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Good: " + current-score.accuracy-good;
+                                color: #3498db;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Ok: " + current-score.accuracy-ok;
+                                color: #f39c12;
+                                font-size: 12px;
+                            }
+                        }
+                        
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            
+                            Text {
+                                text: "Miss: " + current-score.accuracy-miss;
+                                color: #e94560;
+                                font-size: 12px;
+                            }
+                        }
+                    }
+                }
+                
+                Rectangle {}
+                
+                Button {
+                    text: "Pause";
+                    width: 100px;
+                    clicked => {
+                        pause-song();
+                    }
+                }
+                
+                Button {
+                    text: "Back to Menu";
+                    width: 120px;
+                    clicked => {
+                        current-screen = 0;
+                    }
+                }
+            }
+        }
+        }
+    }
+    
+    settings := Rectangle {
+        visible: current-screen == 3;
+        background: #1a1a2e;
+        
+        VerticalLayout {
+            padding: 40px;
+            spacing: 30px;
+            alignment: start;
+            
+            Text {
+                text: "Settings";
+                font-size: 48px;
+                font-weight: 700;
+                color: #00d9ff;
+            }
+            
+            Rectangle {
+                background: #16213e;
+                border-radius: 10px;
+                preferred-height: 500px;
+                
+                ScrollView {
+                    VerticalLayout {
+                        padding: 30px;
+                        spacing: 25px;
+                        
+                        // Note Speed
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: "Note Speed: " + note-speed + "x";
+                                font-size: 18px;
+                                font-weight: 700;
+                                color: #00d9ff;
+                            }
+                            HorizontalLayout {
+                                spacing: 12px;
+                                Text { text: "1x"; color: #888; font-size: 12px; vertical-alignment: center; }
+                                Slider {
+                                    minimum: 1.0;
+                                    maximum: 5.0;
+                                    value: note-speed;
+                                    step: 0.25;
+                                    changed => { note-speed = self.value; }
+                                }
+                                Text { text: "5x"; color: #888; font-size: 12px; vertical-alignment: center; }
+                            }
+                        }
+                        
+                        Text {
+                            text: "Key Bindings";
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: #00d9ff;
+                        }
+                        
+                        // Lane 1 (Red)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 1 (Red):";
+                                color: #e94560;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #e94560;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-1-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 2 (Orange)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 2 (Orange):";
+                                color: #f39c12;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #f39c12;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-2-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 3 (Blue)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 3 (Blue):";
+                                color: #3498db;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #3498db;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-3-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        // Lane 4 (Green)
+                        HorizontalLayout {
+                            spacing: 20px;
+                            alignment: start;
+                            
+                            Text {
+                                text: "Lane 4 (Green):";
+                                color: #2ecc71;
+                                font-size: 16px;
+                                font-weight: 600;
+                                width: 150px;
+                                vertical-alignment: center;
+                            }
+                            
+                            Rectangle {
+                                width: 100px;
+                                height: 40px;
+                                background: #0f3460;
+                                border-width: 2px;
+                                border-color: #2ecc71;
+                                border-radius: 5px;
+                                
+                                Text {
+                                    text: key-bindings.lane-4-key;
+                                    color: #ffffff;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            text: "Note: Click on any lane key to reassign (feature coming soon)";
+                            color: #888888;
+                            font-size: 12px;
+                        }
+                    }
+                }
+            }
+            
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: end;
+                
+                Button {
+                    text: "Reset to Defaults";
+                    clicked => {
+                        key-bindings = {
+                            lane-1-key: "D",
+                            lane-2-key: "F",
+                            lane-3-key: "J",
+                            lane-4-key: "K",
+                        };
+                    }
+                }
+                
+                Button {
+                    text: "Back";
+                    clicked => {
+                        current-screen = 0;
+                    }
+                }
+            }
+        }
+    }
+}
