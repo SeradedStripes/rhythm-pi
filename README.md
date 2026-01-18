@@ -6,9 +6,9 @@ Rhythm PI is a rhythm game built with **Rust** and **Slint**, designed to run ef
 
 | Platform | Target | Status | Binary Size |
 |----------|--------|--------|-------------|
-| Linux x86_64 | `x86_64-unknown-linux-gnu` | | ~MB |
-| Windows x86_64 | `x86_64-pc-windows-gnu` | | ~MB |
-| **Raspberry Pi Zero 2W** | `armv7-unknown-linux-gnueabihf` | | ~MB |
+| Linux x86_64 | `x86_64-unknown-linux-gnu` | ✔️ | ~MB |
+| Windows x86_64 | `x86_64-pc-windows-gnu` | ✔️ | ~MB |
+| **Raspberry Pi Zero 2W** | `armv7-unknown-linux-gnueabihf` | ❌ | ~MB |
 
 ## Raspberry Pi Zero 2W Target
 

@@ -32,20 +32,20 @@ else
 fi
 
 # 2. Linux ARM build
-echo -e "\n${BLUE}[2/3] Building Linux ARM (armv7)...${NC}"
-if rustup target list | grep -q "armv7-unknown-linux-gnueabihf (installed)"; then
-    cargo build --release --target armv7-unknown-linux-gnueabihf
-    ARM_BIN="$BUILD_DIR/armv7-unknown-linux-gnueabihf/release/client-server"
-    if [ -f "$ARM_BIN" ]; then
-        cp "$ARM_BIN" "$RELEASE_DIR/client-server-linux-armv7"
-        echo -e "${GREEN}✓ ARM build successful${NC}"
-    else
-        echo -e "${RED}✗ ARM build failed${NC}"
-    fi
-else
-    echo -e "${RED}✗ armv7-unknown-linux-gnueabihf target not installed${NC}"
-    echo "  Install with: rustup target add armv7-unknown-linux-gnueabihf"
-fi
+#echo -e "\n${BLUE}[2/3] Building Linux ARM (armv7)...${NC}"
+#if rustup target list | grep -q "armv7-unknown-linux-gnueabihf (installed)"; then
+#    cargo build --release --target armv7-unknown-linux-gnueabihf
+#    ARM_BIN="$BUILD_DIR/armv7-unknown-linux-gnueabihf/release/client-server"
+#    if [ -f "$ARM_BIN" ]; then
+#        cp "$ARM_BIN" "$RELEASE_DIR/client-server-linux-armv7"
+#        echo -e "${GREEN}✓ ARM build successful${NC}"
+#    else
+#        echo -e "${RED}✗ ARM build failed${NC}"
+#    fi
+#else
+#    echo -e "${RED}✗ armv7-unknown-linux-gnueabihf target not installed${NC}"
+#    echo "  Install with: rustup target add armv7-unknown-linux-gnueabihf"
+#fi
 
 # 3. Windows build
 echo -e "\n${BLUE}[3/3] Building Windows (x86_64)...${NC}"
