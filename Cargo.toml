@@ -10,5 +10,6 @@ resolver = "2"
 members = [
   "server",
   "client",
+  "charter",
 ]
 
