@@ -19,8 +19,21 @@ pub struct ChartNote {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chart {
+    #[serde(default)]
+    pub song_id: String,
+    #[serde(default)]
+    pub instrument: String,
+    #[serde(default)]
+    pub difficulty: String,
+    #[serde(default = "Chart::default_columns")]
+    pub columns: u8,
+    #[serde(default = "Chart::default_bpm")]
+    pub bpm: f32,
+    #[serde(default)]
+    pub generated_at: Option<i64>,
+    #[serde(default)]
     pub notes: Vec<ChartNote>,
-    pub bpm: Option<f32>,
+    #[serde(default)]
     pub offset: Option<f32>,
 }
 
@@ -29,6 +42,16 @@ pub struct Note {
     pub time: f32,
     pub lane: u32,
     pub duration: f32,
+}
+
+impl Chart {
+    fn default_bpm() -> f32 {
+        120.0
+    }
+
+    fn default_columns() -> u8 {
+        4
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

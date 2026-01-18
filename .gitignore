@@ -1,6 +1,7 @@
 /target
 /server/target
 /client/target
+/charter/target
 
 # Ignore Songs for copyright reasons
 /server/assets/songs/*.mp3

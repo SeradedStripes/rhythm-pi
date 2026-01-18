@@ -1,4 +1,4 @@
-import { Button, StandardListView, LineEdit, ComboBox, ScrollView } from "std-widgets.slint";
+import { Button, StandardListView, LineEdit, ComboBox, ScrollView, Slider } from "std-widgets.slint";
 
 export struct SongData {
     id: string,
@@ -55,6 +55,8 @@ export component MainWindow inherits Window {
     in-out property <string> selected-instrument: "lead";
     in-out property <[NoteData]> chart-notes: [];
     in-out property <float> current-playback-time: 0;
+    // Note scroll speed multiplier (1.0x - 5.0x, step 0.25)
+    in-out property <float> note-speed: 1.0;
     in-out property <ScoreData> current-score: {
         score: 0,
         combo: 0,
@@ -645,12 +647,12 @@ export component MainWindow inherits Window {
                             
                             // Notes falling down the lane
                             for note in chart-notes: Rectangle {
-                                visible: note.fret == 0 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                visible: note.fret == 0 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
                                 height: 30px;
                                 background: #e94560;
                                 border-radius: 2px;
-                                y: 400px - (note.time - current-playback-time) * 150px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
                             }
                         }
                         
@@ -664,12 +666,12 @@ export component MainWindow inherits Window {
                             clip: true;
                             
                             for note in chart-notes: Rectangle {
-                                visible: note.fret == 1 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                visible: note.fret == 1 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
                                 height: 30px;
                                 background: #f39c12;
                                 border-radius: 2px;
-                                y: 400px - (note.time - current-playback-time) * 150px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
                             }
                         }
                         
@@ -683,12 +685,12 @@ export component MainWindow inherits Window {
                             clip: true;
                             
                             for note in chart-notes: Rectangle {
-                                visible: note.fret == 2 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                visible: note.fret == 2 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
                                 height: 30px;
                                 background: #3498db;
                                 border-radius: 2px;
-                                y: 400px - (note.time - current-playback-time) * 150px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
                             }
                         }
                         
@@ -702,12 +704,12 @@ export component MainWindow inherits Window {
                             clip: true;
                             
                             for note in chart-notes: Rectangle {
-                                visible: note.fret == 3 && (note.time - current-playback-time) < 3.0 && (note.time - current-playback-time) > -0.5;
+                                visible: note.fret == 3 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
                                 height: 30px;
                                 background: #2ecc71;
                                 border-radius: 2px;
-                                y: 400px - (note.time - current-playback-time) * 150px;
+                                y: 400px - (note.time - current-playback-time) * (150px * note-speed);
                             }
                         }
                     }
@@ -722,13 +724,38 @@ export component MainWindow inherits Window {
                         drop-shadow-offset-y: 0px;
                     }
                     
-                    // Hit zone indicator
-                    Rectangle {
+                    // Hit zone indicator per lane (reacts to input)
+                    HorizontalLayout {
+                        spacing: 2px;
                         height: 44px;
-                        background: rgba(46, 204, 113, 0.2);
-                        border-width: 3px;
-                        border-color: #2ecc71;
-                        border-radius: 3px;
+                        Rectangle {
+                            width: 25%;
+                            background: lane-1-pressed ? rgba(233, 69, 96, 0.30) : rgba(233, 69, 96, 0.10);
+                            border-width: lane-1-pressed ? 3px : 1px;
+                            border-color: #e94560;
+                            border-radius: 3px;
+                        }
+                        Rectangle {
+                            width: 25%;
+                            background: lane-2-pressed ? rgba(243, 156, 18, 0.30) : rgba(243, 156, 18, 0.10);
+                            border-width: lane-2-pressed ? 3px : 1px;
+                            border-color: #f39c12;
+                            border-radius: 3px;
+                        }
+                        Rectangle {
+                            width: 25%;
+                            background: lane-3-pressed ? rgba(52, 152, 219, 0.30) : rgba(52, 152, 219, 0.10);
+                            border-width: lane-3-pressed ? 3px : 1px;
+                            border-color: #3498db;
+                            border-radius: 3px;
+                        }
+                        Rectangle {
+                            width: 25%;
+                            background: lane-4-pressed ? rgba(46, 204, 113, 0.30) : rgba(46, 204, 113, 0.10);
+                            border-width: lane-4-pressed ? 3px : 1px;
+                            border-color: #2ecc71;
+                            border-radius: 3px;
+                        }
                     }
                     
                     // Key hints below lanes
@@ -926,6 +953,29 @@ export component MainWindow inherits Window {
                 ScrollView {
                     VerticalLayout {
                         spacing: 25px;
+                        
+                        // Note Speed
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: "Note Speed: " + note-speed + "x";
+                                font-size: 18px;
+                                font-weight: 700;
+                                color: #00d9ff;
+                            }
+                            HorizontalLayout {
+                                spacing: 12px;
+                                Text { text: "1x"; color: #888; font-size: 12px; vertical-alignment: center; }
+                                Slider {
+                                    minimum: 1.0;
+                                    maximum: 5.0;
+                                    value: note-speed;
+                                    step: 0.25;
+                                    changed => { note-speed = self.value; }
+                                }
+                                Text { text: "5x"; color: #888; font-size: 12px; vertical-alignment: center; }
+                            }
+                        }
                         
                         Text {
                             text: "Key Bindings";

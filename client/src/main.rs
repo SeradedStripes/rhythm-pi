@@ -300,10 +300,19 @@ fn main() -> Result<()> {
                     
                     // Update UI with chart notes
                     if let Some(ui) = ui_weak.upgrade() {
-                        let notes: Vec<NoteData> = chart.notes.iter().map(|n| NoteData {
-                            time: n.time,
-                            fret: n.col as i32,
-                            duration: n.duration,
+                        let notes: Vec<NoteData> = chart.notes.iter().map(|n| {
+                            // Clamp to 4 lanes for current UI; map any extra lanes to the last lane
+                            let lane = if chart.columns > 4 && n.col >= 4 {
+                                3 // map 4th+ columns to lane 3 to avoid UI issues
+                            } else {
+                                n.col.min(3)
+                            } as i32;
+
+                            NoteData {
+                                time: n.time,
+                                fret: lane,
+                                duration: n.duration,
+                            }
                         }).collect();
                         info!("Setting {} notes on UI", notes.len());
                         let model = std::rc::Rc::new(slint::VecModel::from(notes));
