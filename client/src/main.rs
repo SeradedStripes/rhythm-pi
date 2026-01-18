@@ -193,7 +193,7 @@ fn main() -> Result<()> {
             let frame_count_timer = frame_count.clone();
             let last_log_timer = last_log.clone();
             
-            timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+            timer.start(slint::TimerMode::Repeated, Duration::from_millis(12), move || {
                 let is_running = *game_running_timer.lock().unwrap();
                 if !is_running {
                     return;
@@ -205,13 +205,13 @@ fn main() -> Result<()> {
                 drop(fc);
                 
                 let should_log = frame % 60 == 0;
-                let should_update_ui = frame % 3 == 0; // Update UI ~20 times/sec instead of 60
-                let should_check_misses = frame % 15 == 0; // Check misses ~4 times/sec
+                let should_update_ui = frame % 1 == 0;
+                let should_check_misses = frame % 1 == 0;
                 
                 if should_log {
                     let mut ll = last_log_timer.lock().unwrap();
                     let elapsed = ll.elapsed().as_secs_f32();
-                    let fps = 60.0 / elapsed;
+                    let fps = 120.0 / elapsed;
                     eprintln!("Timer FPS: {:.1}", fps);
                     *ll = Instant::now();
                 }
@@ -244,22 +244,22 @@ fn main() -> Result<()> {
                         let mut game = game_state_timer.lock().unwrap();
                         
                         // Only check notes within a reasonable time window
-                        for note in &chart.notes {
+                        for (i, note) in chart.notes.iter().enumerate() {
                             let time_diff = current_time - note.time;
                             
                             // Only check notes that are slightly past their hit time
                             if time_diff > 0.2 && time_diff < 0.5 {
-                                if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == note.col) {
-                                    game.record_hit(note, current_time);
+                                if !game.notes_hit.iter().any(|h| h.note_index == i) {
+                                    game.record_hit(i, note, current_time);
                                 }
                             }
                         }
                         
                         // Filter out hit notes from the UI
                         if let Some(ui) = ui_clone.upgrade() {
-                            let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
+                            let notes: Vec<NoteData> = chart.notes.iter().enumerate().filter_map(|(i, n)| {
                                 // Skip notes that have been hit
-                                if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
+                                if game.notes_hit.iter().any(|h| h.note_index == i) {
                                     return None;
                                 }
                                 
@@ -432,6 +432,8 @@ fn main() -> Result<()> {
                 info!("Handling key '{}' at game time {:.3}s", key_char, game.current_time);
                 
                 if let Some(event) = input.handle_key_press(key_char, game.current_time) {
+                    // Log input pressed state for the lane
+                    info!("UI Input state lane {} pressed?: {}", event.lane, input.is_lane_pressed(event.lane));
                     // Highlight the key button
                     if let Some(ui) = ui_weak.upgrade() {
                         match event.lane {
@@ -446,48 +448,78 @@ fn main() -> Result<()> {
                     // Check for nearby notes in the chart
                     if let Some(chart) = chart_data.lock().unwrap().as_ref() {
                         let hit_window = 0.3; // 300ms hit window
-                        
-                        for note in &chart.notes {
-                            if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
-                                if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == event.lane) {
-                                    let accuracy = game.record_hit(note, event.timestamp);
-                                    
-                                    info!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
-                                    
-                                    if let Some(ui) = ui_weak.upgrade() {
-                                        ui.set_current_score(ScoreData {
-                                            score: game.score as i32,
-                                            combo: game.combo as i32,
-                                            max_combo: game.max_combo as i32,
-                                            health: game.health,
-                                            accuracy_perfect: game.accuracy_count.perfect as i32,
-                                            accuracy_great: game.accuracy_count.great as i32,
-                                            accuracy_good: game.accuracy_count.good as i32,
-                                            accuracy_ok: game.accuracy_count.ok as i32,
-                                            accuracy_miss: game.accuracy_count.miss as i32,
-                                        });
 
-                                        // Update UI note model immediately to remove hit notes
-                                        let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
-                                            // Skip notes that have been hit
-                                            if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
-                                                return None;
-                                            }
+                        // Gather candidate notes in the hit window for this lane and log them
+                        let candidates: Vec<(usize, &game::ChartNote)> = chart.notes.iter().enumerate()
+                            .filter(|(_i, n)| n.col == event.lane && (n.time - game.current_time).abs() <= hit_window)
+                            .collect();
 
-                                            // Clamp to 4 lanes for current UI
-                                            let lane = if chart.columns > 4 && n.col >= 4 {
-                                                3
-                                            } else {
-                                                n.col.min(3)
-                                            } as i32;
+                        info!("Key press on lane {} at {:.3}s; {} candidate(s): {:?}; already hit count={}",
+                            event.lane,
+                            game.current_time,
+                            candidates.len(),
+                            candidates.iter().map(|(i, n)| (i, n.time)).collect::<Vec<_>>(),
+                            game.notes_hit.len()
+                        );
 
-                                            Some(NoteData { time: n.time, fret: lane, duration: n.duration })
-                                        }).collect();
-                                        let model = std::rc::Rc::new(slint::VecModel::from(notes));
-                                        ui.set_chart_notes(model.into());
-                                    }
-                                    break;
+                        let mut did_hit = false;
+                        for (i_ref, note_ref) in &candidates {
+                            let i = *i_ref;
+                            let note = *note_ref;
+                            if !game.notes_hit.iter().any(|h| h.note_index == i) {
+                                let accuracy = game.record_hit(i, note, event.timestamp);
+
+                                info!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
+
+                                if let Some(ui) = ui_weak.upgrade() {
+                                    ui.set_current_score(ScoreData {
+                                        score: game.score as i32,
+                                        combo: game.combo as i32,
+                                        max_combo: game.max_combo as i32,
+                                        health: game.health,
+                                        accuracy_perfect: game.accuracy_count.perfect as i32,
+                                        accuracy_great: game.accuracy_count.great as i32,
+                                        accuracy_good: game.accuracy_count.good as i32,
+                                        accuracy_ok: game.accuracy_count.ok as i32,
+                                        accuracy_miss: game.accuracy_count.miss as i32,
+                                    });
+
+                                    // Update UI note model immediately to remove hit notes
+                                    let notes: Vec<NoteData> = chart.notes.iter().enumerate().filter_map(|(i, n)| {
+                                        // Skip notes that have been hit
+                                        if game.notes_hit.iter().any(|h| h.note_index == i) {
+                                            return None;
+                                        }
+
+                                        // Clamp to 4 lanes for current UI
+                                        let lane = if chart.columns > 4 && n.col >= 4 {
+                                            3
+                                        } else {
+                                            n.col.min(3)
+                                        } as i32;
+
+                                        Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                                    }).collect();
+                                    let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                                    ui.set_chart_notes(model.into());
                                 }
+                                did_hit = true;
+                                break;
+                            } else {
+                                info!("Skipping already-hit note idx={} lane={}", i, note.col);
+                            }
+                        }
+
+                        if !did_hit && candidates.is_empty() {
+                            // When there are no candidates, log nearest note on this lane to understand why
+                            let nearest = chart.notes.iter().enumerate()
+                                .filter(|(_i, n)| n.col == event.lane)
+                                .min_by(|a, b| ((a.1.time - game.current_time).abs()).partial_cmp(&((b.1.time - game.current_time).abs())).unwrap());
+
+                            if let Some((ni, nn)) = nearest {
+                                info!("No candidate notes for lane {} at {:.3}s; nearest idx={} time={:.3} dt={:.3}s", event.lane, game.current_time, ni, nn.time, nn.time - game.current_time);
+                            } else {
+                                info!("No candidate notes for lane {} at {:.3}s; no notes in chart for this lane", event.lane, game.current_time);
                             }
                         }
                     }
@@ -496,9 +528,12 @@ fn main() -> Result<()> {
         }
     });
     
-    // Set lane pressed callback
+    // Set lane pressed callback (also release input state after visual unpress)
     ui.on_set_lane_pressed({
         let ui_weak = ui_weak.clone();
+        let input_handler = input_handler.clone();
+        let game_state_for_ui = game_state.clone();
+        let chart_data_for_ui = chart_data.clone();
         move |lane| {
             if let Some(ui) = ui_weak.upgrade() {
                 match lane {
@@ -508,9 +543,12 @@ fn main() -> Result<()> {
                     3 => ui.set_lane_4_pressed(true),
                     _ => {}
                 }
-                
-                // Schedule a timer to unpress after 100ms
+
+                // Schedule a timer to unpress after 100ms and release input state
                 let ui_clone = ui_weak.clone();
+                let input_clone = input_handler.clone();
+                let game_state_clone = game_state_for_ui.clone();
+                let chart_clone = chart_data_for_ui.clone();
                 let timer = slint::Timer::default();
                 timer.start(slint::TimerMode::SingleShot, Duration::from_millis(100), move || {
                     if let Some(ui) = ui_clone.upgrade() {
@@ -520,6 +558,100 @@ fn main() -> Result<()> {
                             2 => ui.set_lane_3_pressed(false),
                             3 => ui.set_lane_4_pressed(false),
                             _ => {}
+                        }
+                    }
+
+                    // Also clear the input's pressed state for this lane's key and process a release-based tap
+                    let key_to_release = match lane {
+                        0 => input_clone.lock().unwrap().get_bindings().lane_1,
+                        1 => input_clone.lock().unwrap().get_bindings().lane_2,
+                        2 => input_clone.lock().unwrap().get_bindings().lane_3,
+                        3 => input_clone.lock().unwrap().get_bindings().lane_4,
+                        _ => '\0',
+                    };
+
+                    if key_to_release != '\0' {
+                        let current_time = game_state_clone.lock().unwrap().current_time;
+                        if let Some(event) = input_clone.lock().unwrap().handle_key_release(key_to_release, Some(current_time)) {
+                            // Process the release event similarly to a press
+                            if let Some(chart) = chart_clone.lock().unwrap().as_ref() {
+                                let mut game = game_state_clone.lock().unwrap();
+                                let hit_window = 0.3; // 300ms hit window
+
+                                // Gather candidate notes in the hit window for this lane
+                                let candidates: Vec<(usize, &game::ChartNote)> = chart.notes.iter().enumerate()
+                                    .filter(|(_i, n)| n.col == event.lane && (n.time - game.current_time).abs() <= hit_window)
+                                    .collect();
+
+                                info!("Key release on lane {} at {:.3}s; {} candidate(s): {:?}; already hit count={}",
+                                    event.lane,
+                                    game.current_time,
+                                    candidates.len(),
+                                    candidates.iter().map(|(i, n)| (i, n.time)).collect::<Vec<_>>(),
+                                    game.notes_hit.len()
+                                );
+
+                                let mut did_hit = false;
+                                for (i_ref, note_ref) in &candidates {
+                                    let i = *i_ref;
+                                    let note = *note_ref;
+                                    if !game.notes_hit.iter().any(|h| h.note_index == i) {
+                                        let accuracy = game.record_hit(i, note, event.timestamp);
+
+                                        info!("Hit {:?} on lane {} at time {} (release)", accuracy, event.lane, game.current_time);
+
+                                        if let Some(ui) = ui_clone.upgrade() {
+                                            ui.set_current_score(ScoreData {
+                                                score: game.score as i32,
+                                                combo: game.combo as i32,
+                                                max_combo: game.max_combo as i32,
+                                                health: game.health,
+                                                accuracy_perfect: game.accuracy_count.perfect as i32,
+                                                accuracy_great: game.accuracy_count.great as i32,
+                                                accuracy_good: game.accuracy_count.good as i32,
+                                                accuracy_ok: game.accuracy_count.ok as i32,
+                                                accuracy_miss: game.accuracy_count.miss as i32,
+                                            });
+
+                                            // Update UI note model immediately to remove hit notes
+                                            let notes: Vec<NoteData> = chart.notes.iter().enumerate().filter_map(|(i, n)| {
+                                                // Skip notes that have been hit
+                                                if game.notes_hit.iter().any(|h| h.note_index == i) {
+                                                    return None;
+                                                }
+
+                                                // Clamp to 4 lanes for current UI
+                                                let lane = if chart.columns > 4 && n.col >= 4 {
+                                                    3
+                                                } else {
+                                                    n.col.min(3)
+                                                } as i32;
+
+                                                Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                                            }).collect();
+                                            let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                                            ui.set_chart_notes(model.into());
+                                        }
+                                        did_hit = true;
+                                        break;
+                                    } else {
+                                        info!("Skipping already-hit note idx={} lane={}", i, note.col);
+                                    }
+                                }
+
+                                if !did_hit && candidates.is_empty() {
+                                    // When there are no candidates, log nearest note on this lane to understand why
+                                    let nearest = chart.notes.iter().enumerate()
+                                        .filter(|(_i, n)| n.col == event.lane)
+                                        .min_by(|a, b| ((a.1.time - game.current_time).abs()).partial_cmp(&((b.1.time - game.current_time).abs())).unwrap());
+
+                                    if let Some((ni, nn)) = nearest {
+                                        info!("No candidate notes for lane {} at {:.3}s; nearest idx={} time={:.3} dt={:.3}s", event.lane, game.current_time, ni, nn.time, nn.time - game.current_time);
+                                    } else {
+                                        info!("No candidate notes for lane {} at {:.3}s; no notes in chart for this lane", event.lane, game.current_time);
+                                    }
+                                }
+                            }
                         }
                     }
                 });
@@ -548,47 +680,65 @@ fn main() -> Result<()> {
     
     thread::spawn(move || {
         if let Err(e) = listen(move |event: Event| {
-            if let EventType::KeyPress(key) = event.event_type {
-                let key_char = match key {
-                    Key::KeyA => Some('A'),
-                    Key::KeyS => Some('S'),
-                    Key::KeyJ => Some('J'),
-                    Key::KeyK => Some('K'),
-                    _ => None,
-                };
-                
-                if let Some(ch) = key_char {
-                    // Only process if game is running
-                    if *game_running_kb.lock().unwrap() {
-                        //eprintln!("=== KEY PRESSED: {} ===", ch);
-                        
-                        let mut input = input_handler_kb.lock().unwrap();
-                        let mut game = game_state_kb.lock().unwrap();
-                        
-                        if let Some(event) = input.handle_key_press(ch, game.current_time) {
-                            //eprintln!("Key mapped to lane {}", event.lane);
-                            
-                            // Highlight the key button
-                            if let Some(ui) = ui_weak_kb.upgrade() {
-                                match event.lane {
-                                    0 => ui.invoke_set_lane_pressed(0),
-                                    1 => ui.invoke_set_lane_pressed(1),
-                                    2 => ui.invoke_set_lane_pressed(2),
-                                    3 => ui.invoke_set_lane_pressed(3),
-                                    _ => {}
+            match event.event_type {
+                EventType::KeyPress(key) => {
+                    let key_char = match key {
+                        Key::KeyD => Some('D'),
+                        Key::KeyF => Some('F'),
+                        Key::KeyJ => Some('J'),
+                        Key::KeyK => Some('K'),
+                        _ => None,
+                    };
+
+                    if let Some(ch) = key_char {
+                        // Only process if game is running
+                        if *game_running_kb.lock().unwrap() {
+                            //eprintln!("=== KEY PRESSED: {} ===", ch);
+
+                            let mut input = input_handler_kb.lock().unwrap();
+                            let mut game = game_state_kb.lock().unwrap();
+
+                            if let Some(event) = input.handle_key_press(ch, game.current_time) {
+                                //eprintln!("Key mapped to lane {}", event.lane);
+
+                                // Show whether input state believes the lane is pressed
+                                info!("KB Input state lane {} pressed?: {}", event.lane, input.is_lane_pressed(event.lane));
+
+                                // Highlight the key button
+                                if let Some(ui) = ui_weak_kb.upgrade() {
+                                    match event.lane {
+                                        0 => ui.invoke_set_lane_pressed(0),
+                                        1 => ui.invoke_set_lane_pressed(1),
+                                        2 => ui.invoke_set_lane_pressed(2),
+                                        3 => ui.invoke_set_lane_pressed(3),
+                                        _ => {}
+                                    }
                                 }
-                            }
-                            
-                            // Check for nearby notes in the chart
-                            if let Some(chart) = chart_data_kb.lock().unwrap().as_ref() {
-                                let hit_window = 0.3;
-                                
-                                for note in &chart.notes {
-                                    if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
-                                        if !game.notes_hit.iter().any(|h| h.note_time == note.time && h.note_lane == event.lane) {
-                                            let accuracy = game.record_hit(note, event.timestamp);
-                                            //eprintln!("Hit {:?} on lane {} at time {}", accuracy, event.lane, game.current_time);
-                                            
+
+                                // Check for nearby notes in the chart
+                                if let Some(chart) = chart_data_kb.lock().unwrap().as_ref() {
+                                    let hit_window = 0.3;
+
+                                    // Gather candidate notes in the hit window for this lane and log them
+                                    let candidates_kb: Vec<(usize, &game::ChartNote)> = chart.notes.iter().enumerate()
+                                        .filter(|(_i, n)| n.col == event.lane && (n.time - game.current_time).abs() <= hit_window)
+                                        .collect();
+
+                                    info!("KB key press on lane {} at {:.3}s; {} candidate(s): {:?}; already hit count={}",
+                                        event.lane,
+                                        game.current_time,
+                                        candidates_kb.len(),
+                                        candidates_kb.iter().map(|(i, n)| (i, n.time)).collect::<Vec<_>>(),
+                                        game.notes_hit.len()
+                                    );
+
+                                    let mut did_hit = false;
+                                    for (i_ref, note_ref) in &candidates_kb {
+                                        let i = *i_ref;
+                                        let note = *note_ref;
+                                        if !game.notes_hit.iter().any(|h| h.note_index == i) {
+                                            let _accuracy = game.record_hit(i, note, event.timestamp);
+                                            //eprintln!("Hit {:?} on lane {} at time {}", _accuracy, event.lane, game.current_time);
                                             if let Some(ui) = ui_weak_kb.upgrade() {
                                                 ui.set_current_score(ScoreData {
                                                     score: game.score as i32,
@@ -603,9 +753,9 @@ fn main() -> Result<()> {
                                                 });
 
                                                 // Update UI note model immediately to remove hit notes
-                                                let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
+                                                let notes: Vec<NoteData> = chart.notes.iter().enumerate().filter_map(|(i, n)| {
                                                     // Skip notes that have been hit
-                                                    if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
+                                                    if game.notes_hit.iter().any(|h| h.note_index == i) {
                                                         return None;
                                                     }
 
@@ -621,7 +771,23 @@ fn main() -> Result<()> {
                                                 let model = std::rc::Rc::new(slint::VecModel::from(notes));
                                                 ui.set_chart_notes(model.into());
                                             }
+                                            did_hit = true;
                                             break;
+                                        } else {
+                                            info!("Skipping already-hit note idx={} lane={}", i, note.col);
+                                        }
+                                    }
+
+                                    if !did_hit && candidates_kb.is_empty() {
+                                        // Log nearest note on this lane to understand why
+                                        let nearest = chart.notes.iter().enumerate()
+                                            .filter(|(_i, n)| n.col == event.lane)
+                                            .min_by(|a, b| ((a.1.time - game.current_time).abs()).partial_cmp(&((b.1.time - game.current_time).abs())).unwrap());
+
+                                        if let Some((ni, nn)) = nearest {
+                                            info!("No candidate notes for lane {} at {:.3}s; nearest idx={} time={:.3} dt={:.3}s", event.lane, game.current_time, ni, nn.time, nn.time - game.current_time);
+                                        } else {
+                                            info!("No candidate notes for lane {} at {:.3}s; no notes in chart for this lane", event.lane, game.current_time);
                                         }
                                     }
                                 }
@@ -629,6 +795,109 @@ fn main() -> Result<()> {
                         }
                     }
                 }
+                EventType::KeyRelease(key) => {
+                    let key_char = match key {
+                        Key::KeyD => Some('D'),
+                        Key::KeyF => Some('F'),
+                        Key::KeyJ => Some('J'),
+                        Key::KeyK => Some('K'),
+                        _ => None,
+                    };
+
+                    if let Some(ch) = key_char {
+                        // Clear pressed state so subsequent presses are processed
+                        if *game_running_kb.lock().unwrap() {
+                            info!("KB key release received for '{}'", ch);
+                            let current_time = game_state_kb.lock().unwrap().current_time;
+                            if let Some(event) = input_handler_kb.lock().unwrap().handle_key_release(ch, Some(current_time)) {
+                                // Process the release event similarly to a press
+                                if let Some(chart) = chart_data_kb.lock().unwrap().as_ref() {
+                                    let mut game = game_state_kb.lock().unwrap();
+                                    let hit_window = 0.3; // 300ms hit window
+
+                                    // Gather candidate notes in the hit window for this lane
+                                    let candidates: Vec<(usize, &game::ChartNote)> = chart.notes.iter().enumerate()
+                                        .filter(|(_i, n)| n.col == event.lane && (n.time - game.current_time).abs() <= hit_window)
+                                        .collect();
+
+                                    info!("Key release on lane {} at {:.3}s; {} candidate(s): {:?}; already hit count={}",
+                                        event.lane,
+                                        game.current_time,
+                                        candidates.len(),
+                                        candidates.iter().map(|(i, n)| (i, n.time)).collect::<Vec<_>>(),
+                                        game.notes_hit.len()
+                                    );
+
+                                    let mut did_hit = false;
+                                    for (i_ref, note_ref) in &candidates {
+                                        let i = *i_ref;
+                                        let note = *note_ref;
+                                        if !game.notes_hit.iter().any(|h| h.note_index == i) {
+                                            let accuracy = game.record_hit(i, note, event.timestamp);
+
+                                            info!("Hit {:?} on lane {} at time {} (release)", accuracy, event.lane, game.current_time);
+
+                                            if let Some(ui) = ui_weak_kb.upgrade() {
+                                                ui.set_current_score(ScoreData {
+                                                    score: game.score as i32,
+                                                    combo: game.combo as i32,
+                                                    max_combo: game.max_combo as i32,
+                                                    health: game.health,
+                                                    accuracy_perfect: game.accuracy_count.perfect as i32,
+                                                    accuracy_great: game.accuracy_count.great as i32,
+                                                    accuracy_good: game.accuracy_count.good as i32,
+                                                    accuracy_ok: game.accuracy_count.ok as i32,
+                                                    accuracy_miss: game.accuracy_count.miss as i32,
+                                                });
+
+                                                // Update UI note model immediately to remove hit notes
+                                                let notes: Vec<NoteData> = chart.notes.iter().enumerate().filter_map(|(i, n)| {
+                                                    // Skip notes that have been hit
+                                                    if game.notes_hit.iter().any(|h| h.note_index == i) {
+                                                        return None;
+                                                    }
+
+                                                    // Clamp to 4 lanes for current UI
+                                                    let lane = if chart.columns > 4 && n.col >= 4 {
+                                                        3
+                                                    } else {
+                                                        n.col.min(3)
+                                                    } as i32;
+
+                                                    Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                                                }).collect();
+                                                let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                                                ui.set_chart_notes(model.into());
+                                            }
+                                            did_hit = true;
+                                            break;
+                                        } else {
+                                            info!("Skipping already-hit note idx={} lane={}", i, note.col);
+                                        }
+                                    }
+
+                                    if !did_hit && candidates.is_empty() {
+                                        // Log nearest note on this lane to understand why
+                                        let nearest = chart.notes.iter().enumerate()
+                                            .filter(|(_i, n)| n.col == event.lane)
+                                            .min_by(|a, b| ((a.1.time - game.current_time).abs()).partial_cmp(&((b.1.time - game.current_time).abs())).unwrap());
+
+                                        if let Some((ni, nn)) = nearest {
+                                            info!("No candidate notes for lane {} at {:.3}s; nearest idx={} time={:.3} dt={:.3}s", event.lane, game.current_time, ni, nn.time, nn.time - game.current_time);
+                                        } else {
+                                            info!("No candidate notes for lane {} at {:.3}s; no notes in chart for this lane", event.lane, game.current_time);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Log resulting lane state
+                            let lane = input_handler_kb.lock().unwrap().get_bindings().key_to_lane(ch).unwrap_or(99);
+                            info!("KB Input state lane {} pressed?: {}", lane, input_handler_kb.lock().unwrap().is_lane_pressed(lane));
+                        }
+                    }
+                }
+                _ => {}
             }
         }) {
             eprintln!("Error listening to keyboard: {:?}", e);

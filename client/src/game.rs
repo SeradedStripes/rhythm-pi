@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use log::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Song {
@@ -87,6 +88,7 @@ impl HitAccuracy {
 
 #[derive(Debug, Clone)]
 pub struct HitEvent {
+    pub note_index: usize,
     pub note_time: f32,
     pub hit_time: f32,
     pub accuracy: HitAccuracy,
@@ -130,7 +132,7 @@ impl GameState {
         }
     }
 
-    pub fn record_hit(&mut self, note: &ChartNote, hit_time: f32) -> HitAccuracy {
+    pub fn record_hit(&mut self, note_index: usize, note: &ChartNote, hit_time: f32) -> HitAccuracy {
         let time_diff = (hit_time - note.time).abs();
         
         let accuracy = if time_diff <= 0.05 {
@@ -177,11 +179,14 @@ impl GameState {
         }
 
         self.notes_hit.push(HitEvent {
+            note_index,
             note_time: note.time,
             hit_time,
             accuracy,
             note_lane: note.col,
         });
+
+        info!("Recorded hit: index={} lane={} time={:.3} hit_time={:.3} accuracy={:?}", note_index, note.col, note.time, hit_time, accuracy);
 
         accuracy
     }
@@ -202,5 +207,25 @@ impl GameState {
 impl Default for GameState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_duplicate_notes_can_both_be_hit() {
+        let mut game = GameState::new();
+        let note1 = ChartNote { time: 1.0, col: 0, duration: 0.0 };
+        let note2 = ChartNote { time: 1.0, col: 0, duration: 0.0 };
+
+        let _acc1 = game.record_hit(0, &note1, 1.01);
+        assert_eq!(game.notes_hit.len(), 1);
+        assert_eq!(game.notes_hit[0].note_index, 0);
+
+        let _acc2 = game.record_hit(1, &note2, 1.02);
+        assert_eq!(game.notes_hit.len(), 2);
+        assert_eq!(game.notes_hit[1].note_index, 1);
     }
 }

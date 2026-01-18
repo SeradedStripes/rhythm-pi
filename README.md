@@ -1,6 +1,6 @@
 # Rhythm PI
 
-Rhythm PI is a rhythm game built with **Rust** and **Slint**, designed to run efficiently on a Raspberry Pi Zero 2W and all other platforms.
+Rhythm PI is a rhythm game built with **Rust** and **Slint**, designed to run efficiently on a Raspberry Pi Zero 2W and all other platforms. The main goal is to have it run, optimizations will happen closer to the time of when i have the Raspberry Pi.
 
 ## Platform Targets
 
@@ -31,11 +31,11 @@ Rhythm PI is a rhythm game built with **Rust** and **Slint**, designed to run ef
 - [x] Cross-platform support
 - [x] WebSocket client
 
-### Phase 2: Gameplay (Next)
-- [ ] Note detection
-- [ ] Scoring system
-- [ ] Combo counter
-- [ ] Chart parsing
+### Phase 2: Gameplay
+- [x] Note detection
+- [x] Scoring system
+- [x] Combo counter
+- [x] Chart parsing
 
 ### Phase 3: Optimization
 - [ ] Memory optimization for Pi Zero
@@ -44,7 +44,7 @@ Rhythm PI is a rhythm game built with **Rust** and **Slint**, designed to run ef
 - [ ] Audio streaming optimization
 
 ### Phase 4: Features
-- [ ] Song library management
+- [x] Song library management
 - [ ] Multiplayer support
 - [ ] Leaderboards
 - [ ] Custom charts
