@@ -630,11 +630,12 @@ export component MainWindow inherits Window {
                 VerticalLayout {
                     padding: 20px;
                     spacing: 10px;
+                    width: 60%;
                     
                     // Fret lanes with animated notes
                     HorizontalLayout {
                         spacing: 2px;
-                        height: 400px;
+                        height: 500px;
                         
                         // Lane 1 (Red)
                         Rectangle {
@@ -645,6 +646,17 @@ export component MainWindow inherits Window {
                             border-radius: 5px;
                             clip: true;
                             
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(233, 69, 96, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(233, 69, 96, 0.7);
+                                border-radius: 3px;
+                            }
+                            
                             // Notes falling down the lane
                             for note in chart-notes: Rectangle {
                                 visible: note.fret == 0 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
@@ -653,6 +665,16 @@ export component MainWindow inherits Window {
                                 background: #e94560;
                                 border-radius: 2px;
                                 y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
                             }
                         }
                         
@@ -665,6 +687,17 @@ export component MainWindow inherits Window {
                             border-radius: 5px;
                             clip: true;
                             
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(243, 156, 18, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(243, 156, 18, 0.7);
+                                border-radius: 3px;
+                            }
+                            
                             for note in chart-notes: Rectangle {
                                 visible: note.fret == 1 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
@@ -672,6 +705,16 @@ export component MainWindow inherits Window {
                                 background: #f39c12;
                                 border-radius: 2px;
                                 y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
                             }
                         }
                         
@@ -684,6 +727,17 @@ export component MainWindow inherits Window {
                             border-radius: 5px;
                             clip: true;
                             
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(52, 152, 219, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(52, 152, 219, 0.7);
+                                border-radius: 3px;
+                            }
+                            
                             for note in chart-notes: Rectangle {
                                 visible: note.fret == 2 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
@@ -691,6 +745,16 @@ export component MainWindow inherits Window {
                                 background: #3498db;
                                 border-radius: 2px;
                                 y: 400px - (note.time - current-playback-time) * (150px * note-speed);
+                            }
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
                             }
                         }
                         
@@ -703,6 +767,17 @@ export component MainWindow inherits Window {
                             border-radius: 5px;
                             clip: true;
                             
+                            // Visual hit zone indicator (300ms window)
+                            Rectangle {
+                                y: 360px;
+                                height: 40px;
+                                width: 100%;
+                                background: rgba(46, 204, 113, 0.25);
+                                border-width: 2px;
+                                border-color: rgba(46, 204, 113, 0.7);
+                                border-radius: 3px;
+                            }
+                            
                             for note in chart-notes: Rectangle {
                                 visible: note.fret == 3 && (note.time - current-playback-time) < ((400px / (150px * note-speed)) + 0.5) && (note.time - current-playback-time) > -0.5;
                                 width: parent.width;
@@ -711,50 +786,16 @@ export component MainWindow inherits Window {
                                 border-radius: 2px;
                                 y: 400px - (note.time - current-playback-time) * (150px * note-speed);
                             }
-                        }
-                    }
-                    
-                    // Strike line (hit zone) - notes should be at y=400px (bottom of lanes) when hit
-                    Rectangle {
-                        height: 6px;
-                        background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
-                        width: 100%;
-                        drop-shadow-blur: 10px;
-                        drop-shadow-color: #2ecc71;
-                        drop-shadow-offset-y: 0px;
-                    }
-                    
-                    // Hit zone indicator per lane (reacts to input)
-                    HorizontalLayout {
-                        spacing: 2px;
-                        height: 44px;
-                        Rectangle {
-                            width: 25%;
-                            background: lane-1-pressed ? rgba(233, 69, 96, 0.30) : rgba(233, 69, 96, 0.10);
-                            border-width: lane-1-pressed ? 3px : 1px;
-                            border-color: #e94560;
-                            border-radius: 3px;
-                        }
-                        Rectangle {
-                            width: 25%;
-                            background: lane-2-pressed ? rgba(243, 156, 18, 0.30) : rgba(243, 156, 18, 0.10);
-                            border-width: lane-2-pressed ? 3px : 1px;
-                            border-color: #f39c12;
-                            border-radius: 3px;
-                        }
-                        Rectangle {
-                            width: 25%;
-                            background: lane-3-pressed ? rgba(52, 152, 219, 0.30) : rgba(52, 152, 219, 0.10);
-                            border-width: lane-3-pressed ? 3px : 1px;
-                            border-color: #3498db;
-                            border-radius: 3px;
-                        }
-                        Rectangle {
-                            width: 25%;
-                            background: lane-4-pressed ? rgba(46, 204, 113, 0.30) : rgba(46, 204, 113, 0.10);
-                            border-width: lane-4-pressed ? 3px : 1px;
-                            border-color: #2ecc71;
-                            border-radius: 3px;
+
+                            Rectangle {
+                                y: 400px;
+                                height: 10px;
+                                background: current-playback-time > 0.5 ? #ff0000 : #2ecc71;
+                                width: 100%;
+                                drop-shadow-blur: 10px;
+                                drop-shadow-color: #2ecc71;
+                                drop-shadow-offset-y: 0px;
+                            }
                         }
                     }
                     
@@ -948,10 +989,11 @@ export component MainWindow inherits Window {
             Rectangle {
                 background: #16213e;
                 border-radius: 10px;
-                padding: 30px;
+                preferred-height: 500px;
                 
                 ScrollView {
                     VerticalLayout {
+                        padding: 30px;
                         spacing: 25px;
                         
                         // Note Speed

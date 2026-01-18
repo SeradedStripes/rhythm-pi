@@ -1,31 +1,27 @@
 [1m[33mwarning[0m: profiles for the non root package will be ignored, specify profiles at the workspace root:
 package:   /home/seradedstripes/Projects/rhythm-pi/client/Cargo.toml
 workspace: /home/seradedstripes/Projects/rhythm-pi/Cargo.toml
-[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`release` profile [optimized]]8;;\ target(s) in 0.68s
+[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`release` profile [optimized]]8;;\ target(s) in 0.49s
 [1m[92m     Running[0m `target/release/rhythm-pi-server`
-[2026-01-18T11:07:07Z INFO  rhythm_pi_server] Starting server on 0.0.0.0:8080
-[2026-01-18T11:07:07Z INFO  actix_server::builder] starting 8 workers
-[2026-01-18T11:07:07Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
-[2026-01-18T11:07:07Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:8080", workers: 8, listening on: 0.0.0.0:8080
-[2026-01-18T11:07:08Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "curl/8.17.0" 0.000984
-[2026-01-18T11:07:38Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "ureq/2.12.1" 0.000323
-[2026-01-18T11:07:47Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs/i%20walk%20this%20earth%20all%20by%20myself/chart?instrument=vocals&difficulty=Normal HTTP/1.1" 200 8809 "-" "ureq/2.12.1" 0.000703
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] WebSocket connection request for song: i walk this earth all by myself
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] WebSocket connection started for song: i walk this earth all by myself
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] Client requested audio stream start
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] Starting WebSocket audio stream for: "server/assets/songs/i walk this earth all by myself.mp3"
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] Streaming file: "server/assets/songs/i walk this earth all by myself.mp3", size: 6024277 bytes
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] File split into 736 chunks
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] Audio stream complete
-[2026-01-18T11:07:47Z INFO  rhythm_pi_server::websocket] WebSocket connection closed for song: i walk this earth all by myself
-[2026-01-18T11:07:47Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /ws/audio/i%20walk%20this%20earth%20all%20by%20myself HTTP/1.1" 101 6027268 "-" "-" 0.042403
-[2026-01-18T11:08:28Z INFO  actix_server::server] SIGTERM received; starting graceful shutdown
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::accept] accept thread stopped
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
-[2026-01-18T11:08:28Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-18T12:33:10Z INFO  rhythm_pi_server] Starting server on 0.0.0.0:8080
+[2026-01-18T12:33:10Z INFO  actix_server::builder] starting 8 workers
+[2026-01-18T12:33:10Z INFO  actix_server::server] Actix runtime found; starting in Actix runtime
+[2026-01-18T12:33:10Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:8080", workers: 8, listening on: 0.0.0.0:8080
+[2026-01-18T12:33:11Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "curl/8.17.0" 0.000258
+[2026-01-18T12:33:34Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs HTTP/1.1" 200 280 "-" "ureq/2.12.1" 0.000302
+[2026-01-18T12:33:37Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /api/songs/i%20walk%20this%20earth%20all%20by%20myself/chart?instrument=lead&difficulty=Normal HTTP/1.1" 200 8809 "-" "ureq/2.12.1" 0.000537
+[2026-01-18T12:33:37Z INFO  rhythm_pi_server::websocket] WebSocket connection request for song: i walk this earth all by myself
+[2026-01-18T12:33:37Z INFO  rhythm_pi_server::websocket] WebSocket connection started for song: i walk this earth all by myself
+[2026-01-18T12:33:37Z INFO  rhythm_pi_server::websocket] Client requested audio stream start
+[2026-01-18T12:33:37Z INFO  rhythm_pi_server::websocket] Starting WebSocket audio stream for: "server/assets/songs/i walk this earth all by myself.mp3"
+[2026-01-18T12:33:37Z INFO  rhythm_pi_server::websocket] Streaming file: "server/assets/songs/i walk this earth all by myself.mp3", size: 6024277 bytes
+[2026-01-18T12:33:38Z INFO  rhythm_pi_server::websocket] File split into 736 chunks
+[2026-01-18T12:33:38Z INFO  rhythm_pi_server::websocket] Audio stream complete
+[2026-01-18T12:33:38Z INFO  rhythm_pi_server::websocket] WebSocket connection closed for song: i walk this earth all by myself
+[2026-01-18T12:33:38Z INFO  actix_web::middleware::logger] 127.0.0.1 "GET /ws/audio/i%20walk%20this%20earth%20all%20by%20myself HTTP/1.1" 101 6027268 "-" "-" 0.041461
+[2026-01-18T12:34:03Z INFO  actix_server::server] SIGTERM received; starting graceful shutdown
+[2026-01-18T12:34:03Z INFO  actix_server::accept] accept thread stopped
+[2026-01-18T12:34:03Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-18T12:34:03Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-18T12:34:03Z INFO  actix_server::worker] shutting down idle worker
+[2026-01-18T12:34:03Z INFO  actix_server::worker] shutting down idle worker

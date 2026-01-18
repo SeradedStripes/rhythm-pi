@@ -255,6 +255,27 @@ fn main() -> Result<()> {
                             }
                         }
                         
+                        // Filter out hit notes from the UI
+                        if let Some(ui) = ui_clone.upgrade() {
+                            let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
+                                // Skip notes that have been hit
+                                if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
+                                    return None;
+                                }
+                                
+                                // Clamp to 4 lanes for current UI
+                                let lane = if chart.columns > 4 && n.col >= 4 {
+                                    3
+                                } else {
+                                    n.col.min(3)
+                                } as i32;
+
+                                Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                            }).collect();
+                            let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                            ui.set_chart_notes(model.into());
+                        }
+                        
                         // Update score UI
                         let score_data = ScoreData {
                             score: game.score as i32,
@@ -424,7 +445,7 @@ fn main() -> Result<()> {
                     
                     // Check for nearby notes in the chart
                     if let Some(chart) = chart_data.lock().unwrap().as_ref() {
-                        let hit_window = 0.2; // 200ms hit window
+                        let hit_window = 0.3; // 300ms hit window
                         
                         for note in &chart.notes {
                             if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
@@ -445,6 +466,25 @@ fn main() -> Result<()> {
                                             accuracy_ok: game.accuracy_count.ok as i32,
                                             accuracy_miss: game.accuracy_count.miss as i32,
                                         });
+
+                                        // Update UI note model immediately to remove hit notes
+                                        let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
+                                            // Skip notes that have been hit
+                                            if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
+                                                return None;
+                                            }
+
+                                            // Clamp to 4 lanes for current UI
+                                            let lane = if chart.columns > 4 && n.col >= 4 {
+                                                3
+                                            } else {
+                                                n.col.min(3)
+                                            } as i32;
+
+                                            Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                                        }).collect();
+                                        let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                                        ui.set_chart_notes(model.into());
                                     }
                                     break;
                                 }
@@ -541,7 +581,7 @@ fn main() -> Result<()> {
                             
                             // Check for nearby notes in the chart
                             if let Some(chart) = chart_data_kb.lock().unwrap().as_ref() {
-                                let hit_window = 0.2;
+                                let hit_window = 0.3;
                                 
                                 for note in &chart.notes {
                                     if note.col == event.lane && (note.time - game.current_time).abs() <= hit_window {
@@ -561,6 +601,25 @@ fn main() -> Result<()> {
                                                     accuracy_ok: game.accuracy_count.ok as i32,
                                                     accuracy_miss: game.accuracy_count.miss as i32,
                                                 });
+
+                                                // Update UI note model immediately to remove hit notes
+                                                let notes: Vec<NoteData> = chart.notes.iter().filter_map(|n| {
+                                                    // Skip notes that have been hit
+                                                    if game.notes_hit.iter().any(|h| h.note_time == n.time && h.note_lane == n.col) {
+                                                        return None;
+                                                    }
+
+                                                    // Clamp to 4 lanes for current UI
+                                                    let lane = if chart.columns > 4 && n.col >= 4 {
+                                                        3
+                                                    } else {
+                                                        n.col.min(3)
+                                                    } as i32;
+
+                                                    Some(NoteData { time: n.time, fret: lane, duration: n.duration })
+                                                }).collect();
+                                                let model = std::rc::Rc::new(slint::VecModel::from(notes));
+                                                ui.set_chart_notes(model.into());
                                             }
                                             break;
                                         }
